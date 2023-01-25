@@ -1,4 +1,5 @@
-# CSCAgeingP5
+# CSCAgeingP5 (2017 code for this master branch)
+# Use ageing_dev2022 for CSC 2022 data setup and analysis
 CSC ageing studies on P5 data
 
 1. Setup 
