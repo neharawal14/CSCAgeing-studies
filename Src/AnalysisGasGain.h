@@ -69,8 +69,8 @@ private:
            me31YlocHVsgmLow[3],   me31YlocHVsgmHigh[3],
            me41YlocHVsgmLow[3],   me41YlocHVsgmHigh[3],
            me234_2YlocHVsgmLow[5],me234_2YlocHVsgmHigh[5];
-  TFile * myoutfilefortree[33] ;
-  TTree * outputtree[40]; //output tree 
+  TFile * myoutfilefortree ;
+  TTree * outputtree; //output tree 
   //Format is the following: 
   //treeME11a
   //treeME11b
@@ -124,7 +124,9 @@ private:
 	double z_eta;
 	double z_phi;
 	double z_mass;
-
+  std::vector<TString> _hvsegment_string;                                                                                                                                  
+  TString _hvsegment_string_name;  
+  Int_t _hvsegment;  
 public:
 
   AnalysisGasGain();

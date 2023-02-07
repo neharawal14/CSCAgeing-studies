@@ -11,7 +11,6 @@
 #include <map>
 #include "pressurecsc_2022.h"
 #include "IntegrateLumi_2022.h"
-
 #include "ChargeORIGandInstL.h"
 ClassImp(AnalysisGasGain)
 
@@ -139,7 +138,7 @@ void AnalysisGasGain::SetupTree(){
   //this->SetupPrint();
 		if(debug_bool) std::cout<<"creating trees for all the segments"<<std::endl;
     TString filetreelocation = (TString) histrootname;
-    filetreelocation.ReplaceAll(".root",treename+"_tree.root");
+		filetreelocation.ReplaceAll(".root","_single_tree.root");
     myoutfilefortree = new TFile(filetreelocation,"RECREATE"); 
 		if(debug_bool) std::cout<<" trees created for all the segments"<<std::endl;
     
@@ -165,7 +164,6 @@ void AnalysisGasGain::SetupTree(){
 
 
    outputtree->Branch("_hvsegment",&_hvsegment,"_hvsegment/I");
-	 std::vector<string> *_hvsegment_string;
 	 outputtree->Branch("_hvsegment_string",&_hvsegment_string);
    outputtree->Branch("_etamuon",&_etamuon,"_etamuon/D");
    outputtree->Branch("_phimuon",&_phimuon,"_phimuon/D");
@@ -178,7 +176,6 @@ void AnalysisGasGain::SetupTree(){
 
 		if(debug_bool) std::cout<<" branches declared succesfully for all the segments"<<std::endl;
 		if(debug_bool) std::cout<<"Setup did perfeclty  "<<std::endl;
-}
 
 }
 
@@ -257,7 +254,6 @@ void AnalysisGasGain::Analyze(HistMan *histos) {
   outputtree->Write();
 	if(debug_bool) std::cout<<"issue when we try to close individual trees "<<std::endl;
   myoutfilefortree->Close();
-  }
 	
 	if(debug_bool) std::cout<<"output will be there  "<<std::endl;
 }
@@ -692,8 +688,6 @@ ostringstream ss;
 	    _bunchcrossing = fBunchCrossing;
 	    _eventNb = fEvent;
 	    _timesecond =ftimeSecond ;
-			_hvsegment = hvsgm;
-			_hvsegment_string = GetRegionName(hvsgm);
 	    /*	    cout <<"vt "<< (int)fvertex_nVertex <<
 	      ", "<<  (unsigned int)fvertex_nVertex<<
 	      ", "<<  (float)fvertex_nVertex<<
@@ -711,6 +705,10 @@ ostringstream ss;
 
 	    int iregion = GetRegionIdx(station,ring,hvsgm);
 			if(debug_bool_region)std::cout<<" value of the region in each rechit "<<iregion<<" charge "<<_rhsumQ<<" event Nb"<<_eventNb<<" hv segment "<<hvsgm<<std::endl;
+			_hvsegment = iregion;
+			_hvsegment_string_name=  GetRegionName(iregion);
+			_hvsegment_string.push_back(_hvsegment_string_name);
+
 	    if(iregion >=0)  outputtree->Fill();
 	    else cout <<"region not found! " <<endl;
 	    
