@@ -120,6 +120,8 @@ public :
 	  std::string time_conv(double timeSeconds);
 		void plot_gain_time();
     void Setup_new_tree();
+
+    double NominalHV();
 };
 
 #endif

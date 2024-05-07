@@ -10,6 +10,11 @@
 #include <TH2.h>
 #include <TStyle.h>
 #include <TCanvas.h>
+
+#include "/afs/cern.ch/user/n/nrawal/work/CSCAgeing_code_study/code_area/files_HVandLumi/nonme11_first.h"
+#include "/afs/cern.ch/user/n/nrawal/work/CSCAgeing_code_study/code_area/files_HVandLumi/nonme11_second.h"
+#include "/afs/cern.ch/user/n/nrawal/work/CSCAgeing_code_study/code_area/files_HVandLumi/me11.h"
+
 using namespace std;
 enum ring_station_hvsegm {
   me11a,me11b,me12HV1,me12HV2,me12HV3,me13HV1,me13HV2,me13HV3,
@@ -27,7 +32,7 @@ bool savehistos =false;
 double trimmean =0.7;
 //Offset used in the calculation of the trimmed mean bool istest =false; //For tests, run only on 1/100 of the events
 bool debug_plots = true;
-bool debug_statements =false;
+bool debug_statements =true;
 bool seconditer_plots =false;// If you want to perform a second iteration of the fit to pressure and inst L.
 
 bool corrfrom25to36fbonly = true; // Extract pressure dependency from the range 15 to 20 /fb, 7e33 to 9e33, extract inst L. from the range 15 to 20 /fb 
@@ -154,6 +159,7 @@ void pressure_dependence_removal::Loop(TString input_file_path, TString input_fi
   gStyle->SetOptFit(111);
   if(detregionstr.Index("ZMuMu")>=0) iszmumu=true;
   iszmumu = false;
+  bool debug = false;
 
 
 	time_t initial_time, final_time;
@@ -190,17 +196,20 @@ void pressure_dependence_removal::Loop(TString input_file_path, TString input_fi
 	 // Init initializes all the branches in this tree
    Init(tree);
 	 // output root file after processing 
-   TFile * outf = new TFile(output_path+"outf"+detregionstr+"_"+chamber_string_name+"_output_everything_new.root","recreate");  
+   TFile * outf = new TFile(output_path+"outf"+detregionstr+"_"+chamber_string_name+"_output_everything_run2.root","recreate");  
 	 // Making IntegratedLumi vs gas gain slope dependency before starting any pressure and inst lumi corrections
-   TH3D * hchargevsintegratelumi_initial = new TH3D("hchargevsintegratelumi_initial","charge (ADC counts) vs integ lumi (initial)",3000,0,3000, 160, 0,160  ,770,1,771);
+  // TH3D * hchargevsintegratelumi_initial = new TH3D("hchargevsintegratelumi_initial","charge (ADC counts) vs integ lumi (initial)",3000,0,3000, 50, 0,150  ,770,1,771);
+   TH3D * hchargevsintegratelumi_initial = new TH3D("hchargevsintegratelumi_initial","charge (ADC counts) vs integ lumi (initial)",3000,0,3000, 50, 0,150  ,770,1,771);
 	 // 5 days is 1 bin
 //   TH3D * hchargevstime_initial = new TH3D("hchargevstime_initial","charge (ADC counts) vs time (initial)",3000,0,3000, 60, initial_time,final_time ,770,1,771);
 	 // Loop over tree and reach charge for each rechit
+   int nb_events=0;
    for(int i = 0; i < tree->GetEntries(); i++){
   // for(int i = 0; i < 10000000; i++){
          //if(_integratelumi==0) continue;
          //if(i%100 !=0 &&istest) continue;
 	 	     LoadTree(i);tree->GetEntry(i);
+
          if(i%1000000 ==0)cout << i<<endl;
          // if(badrun(_runNb) ) continue;
          //   if(check7to9e33only  &&_instlumi>9000 ) continue;
@@ -210,21 +219,28 @@ void pressure_dependence_removal::Loop(TString input_file_path, TString input_fi
 				 int rhidreduced = ((int)floor(_rhid/10))%1000;
          if(_rhid> 2000000) rhidreduced +=400;
          int idforcorr = (iszmumu )? 0: rhidreduced ;
+
+         double nominal_HV_value = NominalHV();
+
+         if(debug) std::cout<<" removing the event based on HV"<< " rhid :"<<rhidreduced<<" nominal HV :"<<nominal_HV_value<<" set HV  :"<<_HV<<std::endl;
+         if(abs(_HV-nominal_HV_value) >10) continue;
+
+         nb_events = nb_events+1;
 				 double charge = _rhsumQ_RAW;
-				 std::pair<float, float> 	 HV_to_equalise = UncorrGasGain_HVInitial2016(sumq,fRun,_stationring,_rhid);
-				 float HV_to_equalise = HV_to_equalise.first;
-				 double charge_equalised = _rhsumQ_RAW * HV_to_equalise;
- 				 hchargevsintegratelumi_initial->Fill(charge, _integratelumi, rhidreduced);
- //        hchargevstime_initial->Fill(charge, _timesecond, rhidreduced);
+				 //std::pair<float, float> 	 HV_to_equalise = UncorrGasGain_HVInitial2016(sumq,fRun,_stationring,_rhid);
+				 //float HV_to_equalise = HV_to_equalise.first;
+				 double charge_equalised = _rhsumQ;
+ 				 hchargevsintegratelumi_initial->Fill(charge_equalised, _integratelumi, rhidreduced);
+ //				 hchargevsintegratelumi_initial->Fill(charge, _integratelumi, rhidreduced);
+   //      hchargevstime_initial->Fill(charge, _timesecond, rhidreduced);
+
    }
-	 std::cout<<"working for information with integrate luminoisty"<<hchargevsintegratelumi_initial->GetEntries()<<std::endl;
-  //vector< std::pair<double, double > > params_integratelumi_initial;
-//  params_integratelumi_initial = GetSlope( hchargevsintegratelumi_initial, "_integratelumi_initial", detregionstr,"",outf);
+   std::cout<<" nb of events "<<nb_events<<std::endl;
+	 //std::cout<<"working for information with integrate luminoisty"<<hchargevsintegratelumi_initial->GetEntries()<<std::endl;
+  vector< std::pair<double, double > > params_integratelumi_initial;
+  params_integratelumi_initial = GetSlope( hchargevsintegratelumi_initial, "_integratelumi_initial", detregionstr,"",outf);
 
 	std::cout<<" done with intlumi information"<<std::endl;
-    //outf->cd();
-		//hchargevsintegratelumi_initial->Write();
-		//outf->Close();
 //	 std::cout<<"working for time second information"<<std::endl;
 //	 vector< std::pair<double, double > > params_timesecond_initial;
 //   params_timesecond_initial = GetSlope( hchargevstime_initial, "_timesecond_initial", detregionstr,"",outf);
@@ -248,29 +264,36 @@ double instlumi_up_cut_2018 = 15000;
 double integratelumi_2016_high = 39.32673126400002;
 double integratelumi_2017_high = 83.85340826572357;
 
-bool debug = false;
+
 int n_entries_2017 = 0;
 	 std::cout<<"going to pressure information"<<std::endl;
-   TH3D * hchargevspressure_2016 = new TH3D("hchargevspressure_2016","charge (ADC counts) vs pressure : 2016",3000,0,3000, 40, 943,984  ,770,1,771);
-   TH3D * hchargevspressure_2017 = new TH3D("hchargevspressure_2017","charge (ADC counts) vs pressure : 2017",3000,0,3000, 40, 943,984  ,770,1,771);
-   TH3D * hchargevspressure_2018 = new TH3D("hchargevspressure_2018","charge (ADC counts) vs pressure : 2018",3000,0,3000, 40, 943,984  ,770,1,771);
+   TH3D * hchargevspressure_2016 = new TH3D("hchargevspressure_2016","charge (ADC counts) vs pressure : 2016",3000,0,3000, 20, 943,984  ,770,1,771);
+   TH3D * hchargevspressure_2017 = new TH3D("hchargevspressure_2017","charge (ADC counts) vs pressure : 2017",3000,0,3000, 20, 943,984  ,770,1,771);
+   TH3D * hchargevspressure_2018 = new TH3D("hchargevspressure_2018","charge (ADC counts) vs pressure : 2018",3000,0,3000, 20, 943,984  ,770,1,771);
    for(int i = 0; i < tree->GetEntries(); i++){
    //for(int i = 0; i < 10000000; i++){
       //     if(droppressurecorr)break;
       //     if(i%100 !=0&&istest) continue;
      LoadTree(i);tree->GetEntry(i);
      if(i%1000000 ==0)cout << i<<endl; if(badrun(_runNb) ) continue;
-		 if(_integratelumi <= integratelumi_2016_high) { 
-			 if(_integratelumi<intlumi_low_cut_2016 ) continue;
- 	     if(_integratelumi>intlumi_up_cut_2016) continue;
-       if(_instlumi<instlumi_low_cut_2016) continue;
-       if(_instlumi>instlumi_up_cut_2016 ) continue;
      	 int rhidreduced = ((int)floor(_rhid/10))%1000;
        if(_rhid> 2000000) rhidreduced +=400;//First (second) endcap have rechit ID < (>) 2000000
      //     Reduced rechit ID has the following format: (A+B)*10+C, where A=1,..36 (chamber nb), B =0 (endcap 1) or 40 (endcap 2)  and C =1,..., 6 (layer).
 		 
 //		 if(isbadchannel("ME11",rhidreduced,_runNb, _integratelumi)  ) continue;
-       hchargevspressure_2016->Fill(_rhsumQ_RAW, _pressure , rhidreduced);
+         double nominal_HV_value = NominalHV();
+         if(debug) std::cout<<" removing the event based on HV"<< " rhid :"<<rhidreduced<<" nominal HV :"<<nominal_HV_value<<" set HV  :"<<_HV<<std::endl;
+         if(abs(_HV-nominal_HV_value) >10) continue;
+
+
+		 if(_integratelumi <= integratelumi_2016_high) { 
+			 if(_integratelumi<intlumi_low_cut_2016 ) continue;
+ 	     if(_integratelumi>intlumi_up_cut_2016) continue;
+       if(_instlumi<instlumi_low_cut_2016) continue;
+       if(_instlumi>instlumi_up_cut_2016 ) continue;
+       hchargevspressure_2016->Fill(_rhsumQ, _pressure , rhidreduced);
+       //hchargevspressure_2016->Fill(_rhsumQ_RAW, _pressure , rhidreduced);
+
 			 if(debug) std::cout<<" inside the 2016 instlumi loop"<<std::endl;
      }
 		 if( integratelumi_2016_high <_integratelumi && _integratelumi<= integratelumi_2017_high) { 
@@ -278,11 +301,9 @@ int n_entries_2017 = 0;
  	     if(_integratelumi>intlumi_up_cut_2017) continue;
        if(_instlumi<instlumi_low_cut_2017) continue;
        if(_instlumi>instlumi_up_cut_2017 ) continue;
-     	 int rhidreduced = ((int)floor(_rhid/10))%1000;
-       if(_rhid> 2000000) rhidreduced +=400;//First (second) endcap have rechit ID < (>) 2000000
-
 			 n_entries_2017 = n_entries_2017+1;
-       hchargevspressure_2017->Fill(_rhsumQ_RAW, _pressure , rhidreduced);
+       //hchargevspressure_2017->Fill(_rhsumQ_RAW, _pressure , rhidreduced);
+       hchargevspressure_2017->Fill(_rhsumQ, _pressure , rhidreduced);
 			 ///if(debug) std::cout<<" inside the 2017 instlumi loop"<<std::endl;
      }
 		 if( integratelumi_2017_high <_integratelumi) { 
@@ -290,9 +311,8 @@ int n_entries_2017 = 0;
  	     if(_integratelumi>intlumi_up_cut_2018) continue;
        if(_instlumi<instlumi_low_cut_2018) continue;
        if(_instlumi>instlumi_up_cut_2018 ) continue;
-     	 int rhidreduced = ((int)floor(_rhid/10))%1000;
-       if(_rhid> 2000000) rhidreduced +=400;//First (second) endcap have rechit ID < (>) 2000000
-       hchargevspressure_2018->Fill(_rhsumQ_RAW, _pressure , rhidreduced);
+       //hchargevspressure_2018->Fill(_rhsumQ_RAW, _pressure , rhidreduced);
+       hchargevspressure_2018->Fill(_rhsumQ, _pressure , rhidreduced);
 
 			 if(debug) std::cout<<" inside the 2018 instlumi loop"<<std::endl;
      }
@@ -312,6 +332,7 @@ int n_entries_2017 = 0;
 		if(hchargevspressure_2018 != NULL&& hchargevspressure_2018->GetEntries() >=100){
     params_pressure_2018 = GetSlope( hchargevspressure_2018, "_pressure", detregionstr,"",outf);  // The function on the line above fits the trim mean charge vs pressure for each rechit and returns the fitted parameters.   
 		}
+    std::cout<<" pressure parameter "<<params_pressure_2018[0].first<<" second "<<params_pressure_2018[0].second<<std::endl;
 //	outf->Close();
 	std::cout<<" after closing the file "<<std::endl;
 
@@ -352,9 +373,9 @@ int n_entries_2017 = 0;
 ////
 ////   vector< std::pair<double, double > > params_instlumi;
 ////   params_instlumi = GetSlope( hchargevsinstlumi, "_instlumi", detregionstr,"",outf); 
-////	*/ 
+////	 
 ////  //
-/////*
+////
 ////
 //// std::cout<<"issue after 1st set of iteration "<<std::endl;
 ////   //Second iteration (optional): same game
@@ -415,7 +436,7 @@ int n_entries_2017 = 0;
 ////     
 ////   }
 ////   params_instlumi_2 = GetSlope( hchargevsinstlumi_2, "_instlumi_2", detregionstr,"",outf);
-//// */   
+////    
 ////  // 
 ////	 std::cout<<" pressure corrections derived , going for application "<<std::endl;
 //////	 TFile *file_output = new TFile(output_path+"output_after_pressure_depenedence_removal_"+chamber_string_name +"_everything_separate.root","RECREATE");
@@ -423,27 +444,11 @@ int n_entries_2017 = 0;
 //////	 tree_new->SetDirectory(0); 
 //////   Setup_new_tree(); 
 ////   //Now final charge after pressure, instlumi correction
-   TH3D * hchargevsintegratelumi = new TH3D("hchargevsintegratelumi","charge (ADC counts) vs integ lumi",3000,0,3000, 160, 0,160  ,770,1,771);
+   TH3D * hchargevsintegratelumi = new TH3D("hchargevsintegratelumi","charge (ADC counts) vs integ lumi",3000,0,3000, 50, 0,150  ,770,1,771);
  //  TH3D * hchargevstime = new TH3D("hchargevstime","charge (ADC counts) vs time",3000,0,3000, 60, initial_time,final_time  ,770,1,771);
 
-	// std::cout<<" pressure corrections derived , filling the root file "<<std::endl;
-   //for(int i = 0; i < tree->GetEntries(); i++){
-//	 int j;
-//	 int save_entries =  100000;
-
-   	//tree_new->SetAutoFlush(-30000000); //("", TObject::kOverwrite);
- //  int num_cycles = tree->GetEntries()/save_entries;
-//	 if(num_cycles!=0) {
-//   for(int j = 0; j <= num_cycles -1; j++){
-//   for(int i = j*1000000; i < (j+1)* 1000000; i++){
-     // std::cout<<"entered into integratedlumi loop correction "<<i<<std::endl; 
-		 //if(_integratelumi==0) continue;
-     // std::cout<<"case for which integratedlumi correction exists "<<i<<std::endl; 
-     //if(i%100 !=0 &&istest) continue;
-		 //tree_new->SetMaxTreeSize(Long64_t size)
-		 //int half_entries = (tree->GetEntries()/2);
 		 // When we apply correction we should take average dependence for pressure : avg of plus and minus endcap
-		 for(int i=0 ; i<tree->GetEntries(); i++){
+	 for(int i=0 ; i<tree->GetEntries(); i++){
 		 //for(int i=0; i<10000000; i++){
 
      LoadTree(i);tree->GetEntry(i);
@@ -453,143 +458,48 @@ int n_entries_2017 = 0;
      int rhidreduced = ((int)floor(_rhid/10))%1000;
      if(_rhid> 2000000) rhidreduced +=400;
      int idforcorr = (iszmumu )? 0: rhidreduced ;
-	//	 if(isbadchannel("ME11",rhidreduced,_runNb,_integratelumi)  ) continue;
-     //double charge  = _rhsumQ_RAW* ApplyCorrection( _pressure ,"pressure",   (params_pressure[idforcorr]).first , (params_pressure[idforcorr]).second )  * ApplyCorrection(_instlumi, "instlumi", (params_instlumi[idforcorr]).first , (params_instlumi[idforcorr]).second ) ;
-     //double charge  = _rhsumQ_RAW* ApplyCorrection( _pressure ,"pressure",   (params_pressure[0]).first , (params_pressure[0]).second );
      double charge, charge_equalized; 
-      
-		//applying pressure correction by taking average of slope dependence in plus and minus endcap 
-		 //double params_pressure_const_avg =  (params_pressure[0].first + params_pressure[771].first)/2. ;
-		 //double params_pressure_slope_avg =  (params_pressure[0].second + params_pressure[771].second)/2. ;
+     double nominal_HV_value = NominalHV();
+     if(debug) std::cout<<" removing the event based on HV"<< " rhid :"<<rhidreduced<<" nominal HV :"<<nominal_HV_value<<" set HV  :"<<_HV<<std::endl;
+     if(abs(_HV-nominal_HV_value) >10) continue;
+
+     
+		 //applying pressure correction by taking average of slope dependence in plus and minus endcap 
 		 //charge  = _rhsumQ_RAW * ApplyCorrection( _pressure ,"pressure",   params_pressure_const_avg ,params_pressure_slope_avg );
      //charge_equalized  = _rhsumQ * ApplyCorrection( _pressure ,"pressure", params_pressure_const_avg ,params_pressure_slope_avg ) ; 
     if(_integratelumi <= integratelumi_2016_high){
-		 if(rhidreduced <400 ) {
-			 if(debug) std::cout<<" inside the pressure correction for 2016"<<" event "<<i<<std::endl;
-			 charge  = _rhsumQ_RAW * ApplyCorrection( _pressure ,"pressure",   (params_pressure_2016[0]).first , (params_pressure_2016[0]).second );
-//    charge_equalized  = _rhsumQ * ApplyCorrection( _pressure ,"pressure",   (params_pressure[0]).first , (params_pressure[0]).second );
-		 }
-     if(rhidreduced >=400 ) { 
-			 if(debug) std::cout<<" inside the pressure correction for 2016"<<" event "<<i<<std::endl;
-			 charge  = _rhsumQ_RAW * ApplyCorrection( _pressure ,"pressure",   (params_pressure_2016[771]).first , (params_pressure_2016[771]).second );
-     //charge_equalized  = _rhsumQ * ApplyCorrection( _pressure ,"pressure",   (params_pressure[771]).first , (params_pressure[771]).second ); 
-		 }
+		 double params_pressure_const_avg =  (params_pressure_2016[0].first + params_pressure_2016[771].first)/2. ;
+		 double params_pressure_slope_avg =  (params_pressure_2016[0].second + params_pressure_2016[771].second)/2. ;
+		 charge  = _rhsumQ_RAW * ApplyCorrection( _pressure ,"pressure",   params_pressure_const_avg ,params_pressure_slope_avg );
+     charge_equalized  = _rhsumQ * ApplyCorrection( _pressure ,"pressure", params_pressure_const_avg ,params_pressure_slope_avg ) ; 
+
 		}
 	if( integratelumi_2016_high < _integratelumi && _integratelumi<= integratelumi_2017_high) { 
-		 if(rhidreduced <400 ) {
-			 if(debug) std::cout<<" inside the pressure correction for 2017"<<" event "<<i<<std::endl;
-			 charge  = _rhsumQ_RAW * ApplyCorrection( _pressure ,"pressure",   (params_pressure_2017[0]).first , (params_pressure_2017[0]).second );
-     //charge_equalized  = _rhsumQ * ApplyCorrection( _pressure ,"pressure",   (params_pressure[0]).first , (params_pressure[0]).second );
-		 }
-     if(rhidreduced >=400 ) { 
-			 if(debug) std::cout<<" inside the pressure correction for 2017"<<" event "<<i<<std::endl;
-			 charge  = _rhsumQ_RAW * ApplyCorrection( _pressure ,"pressure",   (params_pressure_2017[771]).first , (params_pressure_2017[771]).second );
-     //charge_equalized  = _rhsumQ * ApplyCorrection( _pressure ,"pressure",   (params_pressure[771]).first , (params_pressure[771]).second ); 
-		 }
-		}
+
+		 double params_pressure_const_avg =  (params_pressure_2017[0].first + params_pressure_2017[771].first)/2. ;
+		 double params_pressure_slope_avg =  (params_pressure_2017[0].second + params_pressure_2017[771].second)/2. ;
+		 charge  = _rhsumQ_RAW * ApplyCorrection( _pressure ,"pressure",   params_pressure_const_avg ,params_pressure_slope_avg );
+     charge_equalized  = _rhsumQ * ApplyCorrection( _pressure ,"pressure", params_pressure_const_avg ,params_pressure_slope_avg ) ; 
+	 }
     if(_integratelumi > integratelumi_2017_high){
-		 if(rhidreduced <400 ) {
-			 if(debug) std::cout<<" inside the pressure correction for 2018"<<" event "<<i<<std::endl;
-			 charge  = _rhsumQ_RAW * ApplyCorrection( _pressure ,"pressure",   (params_pressure_2018[0]).first , (params_pressure_2018[0]).second );
-     //charge_equalized  = _rhsumQ * ApplyCorrection( _pressure ,"pressure",   (params_pressure[0]).first , (params_pressure[0]).second );
-		 }
-     if(rhidreduced >=400 ) { 
-			 if(debug) std::cout<<" inside the pressure correction for 2018"<<" event "<<i<<std::endl;
-			 charge  = _rhsumQ_RAW * ApplyCorrection( _pressure ,"pressure",   (params_pressure_2018[771]).first , (params_pressure_2018[771]).second );
-     //charge_equalized  = _rhsumQ * ApplyCorrection( _pressure ,"pressure",   (params_pressure[771]).first , (params_pressure[771]).second ); 
-		 }
+
+		 double params_pressure_const_avg =  (params_pressure_2018[0].first + params_pressure_2018[771].first)/2. ;
+		 double params_pressure_slope_avg =  (params_pressure_2018[0].second + params_pressure_2018[771].second)/2. ;
+		 charge  = _rhsumQ_RAW * ApplyCorrection( _pressure ,"pressure",   params_pressure_const_avg ,params_pressure_slope_avg );
+     charge_equalized  = _rhsumQ * ApplyCorrection( _pressure ,"pressure", params_pressure_const_avg ,params_pressure_slope_avg ) ; 
+
 		}
-
-	 // ApplyCorrection(_instlumi, "instlumi", (params_instlumi[idforcorr]).first , (params_instlumi[idforcorr]).second ) ;
-   //		 if(seconditer) charge = charge *  ApplyCorrection( _pressure ,"pressure",   (params_pressure_2[idforcorr]).first , (params_pressure_2[idforcorr]).second )  * ApplyCorrection(_instlumi, "instlumi", (params_instlumi_2[idforcorr]).first , (params_instlumi_2[idforcorr]).second ) ;
-  //		 if(seconditer) charge = charge *  ApplyCorrection( _pressure ,"pressure",   (params_pressure_2[idforcorr]).first , (params_pressure_2[idforcorr]).second );
-//		 if(seconditer) charge = charge *  ApplyCorrection( _pressure ,"pressure",   (params_pressure_2[0]).first , (params_pressure_2[0]).second );
- //	 * ApplyCorrection(_instlumi, "instlumi", (params_instlumi_2[idforcorr]).first , (params_instlumi_2[idforcorr]).second ) ;
-
- hchargevsintegratelumi->Fill(charge, _integratelumi, rhidreduced);
+////
+////	 // ApplyCorrection(_instlumi, "instlumi", (params_instlumi[idforcorr]).first , (params_instlumi[idforcorr]).second ) ;
+////   //		 if(seconditer) charge = charge *  ApplyCorrection( _pressure ,"pressure",   (params_pressure_2[idforcorr]).first , (params_pressure_2[idforcorr]).second )  * ApplyCorrection(_instlumi, "instlumi", (params_instlumi_2[idforcorr]).first , (params_instlumi_2[idforcorr]).second ) ;
+////  //		 if(seconditer) charge = charge *  ApplyCorrection( _pressure ,"pressure",   (params_pressure_2[idforcorr]).first , (params_pressure_2[idforcorr]).second );
+//////		 if(seconditer) charge = charge *  ApplyCorrection( _pressure ,"pressure",   (params_pressure_2[0]).first , (params_pressure_2[0]).second );
+//// //	 * ApplyCorrection(_instlumi, "instlumi", (params_instlumi_2[idforcorr]).first , (params_instlumi_2[idforcorr]).second ) ;
+////
+ hchargevsintegratelumi->Fill(charge_equalized, _integratelumi, rhidreduced);
 // hchargevsintegratelumi->Fill(_rhsumQ_RAW, _integratelumi, rhidreduced);
  }
-//////   hchargevstime->Fill(charge, _timesecond, rhidreduced);
-//////   new_eventNb       = _eventNb       ; 
-//////   new_runNb         = _runNb         ;  
-//////   new_lumiBlock     = _lumiBlock     ;
-//////   new_rhid          = _rhid          ;  
-//////   new_stationring   = _stationring   ;
-//////   new_rhsumQ        = charge_equalized        ; 
-//////	 new_HV           =  _HV;
-//////	 new_current           =  _current;
-//////   new_rhsumQ_RAW    = charge    ;
-//////   new_pressure      = _pressure      ; 
-//////   new_temperature   = _temperature   ;
-//////   new_instlumi      = _instlumi      ; 
-//////   new_integratelumi = _integratelumi ;
-//////   new_timesecond    = _timesecond    ;
-//////   new_n_PV          = _n_PV          ;
-//////   new_bunchcrossing = _bunchcrossing ;
-//////	 tree_new->Fill();
-////
-//////	 if(i%save_entries ==0) {
-//////   	tree_new->Write("", TObject::kOverwrite);
-//////	 }
-////	// }
-////  // tree_new->Write("", TObject::kOverwrite);
-////	// }
-////    /*if(num_cycles==0) { j=0;} 
-////    if(j==num_cycles || num_cycles==0){
-////	 		for(int i = j*1000000; i < tree->GetEntries(); i++){
-////     // std::cout<<"entered into integratedlumi loop correction "<<i<<std::endl; 
-////		 //if(_integratelumi==0) continue;
-////     // std::cout<<"case for which integratedlumi correction exists "<<i<<std::endl; 
-////     //if(i%100 !=0 &&istest) continue;
-////     LoadTree(i);tree->GetEntry(i);
-////     if(i%1000000 ==0)cout << i<<endl;
-////     if(badrun(_runNb) ) continue;
-////     if(check7to9e33only  &&_instlumi<8000 ) continue;
-////     if(check7to9e33only  &&_instlumi>14000 ) continue;
-////     // what is significance of this ?
-////  	 if(check7to9e33only) _integratelumi -= 17000;
-////     int rhidreduced = ((int)floor(_rhid/10))%1000;
-////     if(_rhid> 2000000) rhidreduced +=400;
-////     int idforcorr = (iszmumu )? 0: rhidreduced ;
-////  //	 if(isbadchannel("ME11",rhidreduced,_runNb,_integratelumi)  ) continue;
-////     //double charge  = _rhsumQ_RAW* ApplyCorrection( _pressure ,"pressure",   (params_pressure[idforcorr]).first , (params_pressure[idforcorr]).second )  * ApplyCorrection(_instlumi, "instlumi", (params_instlumi[idforcorr]).first , (params_instlumi[idforcorr]).second ) ;
-////     //double charge  = _rhsumQ_RAW* ApplyCorrection( _pressure ,"pressure",   (params_pressure[0]).first , (params_pressure[0]).second );
-////     double charge, charge_equalized; 
-////
-////  	 if(rhidreduced <400 ) { charge  = _rhsumQ_RAW * ApplyCorrection( _pressure ,"pressure",   (params_pressure[0]).first , (params_pressure[0]).second );
-////     charge_equalized  = _rhsumQ * ApplyCorrection( _pressure ,"pressure",   (params_pressure[0]).first , (params_pressure[0]).second ); }
-////     if(rhidreduced >=400 ) { charge  = _rhsumQ_RAW * ApplyCorrection( _pressure ,"pressure",   (params_pressure[771]).first , (params_pressure[771]).second );
-////     charge_equalized  = _rhsumQ * ApplyCorrection( _pressure ,"pressure",   (params_pressure[771]).first , (params_pressure[771]).second ); }
-////
-////  	 // ApplyCorrection(_instlumi, "instlumi", (params_instlumi[idforcorr]).first , (params_instlumi[idforcorr]).second ) ;
-////     //		 if(seconditer) charge = charge *  ApplyCorrection( _pressure ,"pressure",   (params_pressure_2[idforcorr]).first , (params_pressure_2[idforcorr]).second )  * ApplyCorrection(_instlumi, "instlumi", (params_instlumi_2[idforcorr]).first , (params_instlumi_2[idforcorr]).second ) ;
-////    //		 if(seconditer) charge = charge *  ApplyCorrection( _pressure ,"pressure",   (params_pressure_2[idforcorr]).first , (params_pressure_2[idforcorr]).second );
-//////		 if(seconditer) charge = charge *  ApplyCorrection( _pressure ,"pressure",   (params_pressure_2[0]).first , (params_pressure_2[0]).second );
-////   //	 * ApplyCorrection(_instlumi, "instlumi", (params_instlumi_2[idforcorr]).first , (params_instlumi_2[idforcorr]).second ) ;
-////
-//////   hchargevsintegratelumi->Fill(charge, _integratelumi, rhidreduced);
-//////   hchargevstime->Fill(charge, _timesecond, rhidreduced);
-//// //  new_eventNb       = _eventNb       ; 
-//// //  new_runNb         = _runNb         ;  
-//// //  new_lumiBlock     = _lumiBlock     ;
-////   new_rhid          = _rhid          ;  
-//// //  new_stationring   = _stationring   ;
-////   new_rhsumQ        = charge_equalized        ; 
-////   new_HV           =  _HV;
-////   new_rhsumQ_RAW    = charge    ;
-////   new_pressure      = _pressure      ; 
-//// //  new_temperature   = _temperature   ;
-//// //  new_instlumi      = _instlumi      ; 
-//// //  new_integratelumi = _integratelumi ;
-////   new_timesecond    = _timesecond    ;
-//// //  new_n_PV          = _n_PV          ;
-//// //  new_bunchcrossing = _bunchcrossing ;
-////   tree_new->Fill();
-////  }
-////   tree_new->Write("", TObject::kOverwrite);
-////  }*/ 
-////	 //
-	 std::cout<<"after filling th eluminoisty distribution "<<std::endl; 
+////	 std::cout<<"after filling th eluminoisty distribution "<<std::endl; 
    vector< std::pair<double, double > > params_integratelumi;
    params_integratelumi = GetSlope( hchargevsintegratelumi, "_integratelumi", detregionstr,"",outf); 
 	 std::cout<<"working for time second information after correction "<<std::endl; 
@@ -599,35 +509,19 @@ int n_entries_2017 = 0;
 	 //file_output->cd();
 	 std::cout<<" error in root file  filling the root file "<<std::endl;
 	 }
-////	 //tree_new->Write();
-////	 //file_output->Close(); 
-////	
-/////*
-////	 int nbins_time = hchargevstime->GetNbinsX();
-////	 for(int i=1; i<= nbins_time ; i++){
-////		 double bin_content = hchargevstime->GetBinContent(i);
-////		 double binLowEdge = hchargevstime->GetXaxis()->GetBinLowEdge(i);
-////		 double binUpEdge = hchargevstime->GetXaxis()->GetBinLowEdge(i+1);
-//// 
-////		 if (bin_content == 0 || TMath::IsNaN(bin_content)) continue;
-////	   outfile<<bin_content<<"\t"<<binLowEdge<<"\t"<<binUpEdge<<std::endl;
-////	 } */
-//// // outf->Close(); 
-////   std::cout<<"issue realized after coming to end"<<std::endl;
-  
-//}
 
-vector < std::pair<double, double > >  pressure_dependence_removal::GetSlope( TH3D * myh , TString thevar , TString filename, TString title, TFile * outf){
+   vector < std::pair<double, double > >  pressure_dependence_removal::GetSlope( TH3D * myh , TString thevar , TString filename, TString title, TFile * outf){
 
-	TString name_histogram = myh->GetName();
+	  TString name_histogram = myh->GetName();
 
    if(debug_print) std::cout<<"inside the slope function for the var "<<thevar<<std::endl;
   //Will store all the fit results in a TTree (one entry per channel)
-  TString treename_goodchannels = "tree_all_goodchannels"+thevar ; 
+  TString treename_goodchannels; 
   std::cout<<" name of histgoram "<<name_histogram<<std::endl;
 	if(name_histogram=="hchargevspressure_2016") treename_goodchannels = treename_goodchannels+"_2016";
 	else if(name_histogram=="hchargevspressure_2017") treename_goodchannels = treename_goodchannels+"_2017";
 	else if(name_histogram=="hchargevspressure_2018") treename_goodchannels = treename_goodchannels+"_2018";
+  else treename_goodchannels = "tree_all_goodchannels"+thevar ; 
 
 	std::cout<<" name of the tree good channels ************************ pressure **********"<<treename_goodchannels<<std::endl;
   TTree * theouttree_goodchannels = new TTree(treename_goodchannels,"");
@@ -635,8 +529,7 @@ vector < std::pair<double, double > >  pressure_dependence_removal::GetSlope( TH
 	if(name_histogram=="hchargevspressure_2016") treename = "tree_"+thevar+"_2016";
 	else if(name_histogram=="hchargevspressure_2017") treename ="tree_"+thevar+ "_2017";
 	else if(name_histogram=="hchargevspressure_2018") treename = "tree_"+thevar+"_2018";
-  else
-  treename= "tree_"+thevar ; 
+  else treename= "tree_"+thevar ; 
 
 
   TTree * theouttree = new TTree(treename,"");
@@ -726,8 +619,8 @@ vector < std::pair<double, double > >  pressure_dependence_removal::GetSlope( TH
   // Reduced rechit ID has the following format: (A+B)*10+C, where A=1,..36 (chamber nb), B =0 (endcap 1) or 40 (endcap 2)  and C =1,..., 6 (layer). 
 	// For calculating normalized charge distribution for all layers together
 	// h=0 corresponds to the plus endcap, h=771 corresponds to minus endcap
-	ofstream mean_values;
-	mean_values.open("mean_values.txt");
+	//ofstream mean_values;
+	//mean_values.open("mean_values.txt");
   TString rhidshort;
 	//TH1D *new_mean_positive;
 	//TH1D *new_mean_negative;
@@ -753,12 +646,8 @@ vector < std::pair<double, double > >  pressure_dependence_removal::GetSlope( TH
 		if(debug_statements) std::cout<<" testing only  good channels plus and minus, h value"<<h<<" rhid values "<<rhidshort<<" endcap "<<endcap<<std::endl;
     //Declare a new histo to store trimmed mean for different values of the variable of interest (pressure, inst L,...)
     TString htrimmeanvsXname = "htrimmean"+filename+title+thevar+"_"+rhidshort;
-    TString htrimmeanvsXname_special = "htrimmean"+filename+title+thevar+"_"+rhidshort+"_special";
     TH1D * htrimmeanvsX = new TH1D(htrimmeanvsXname,"", myh->GetNbinsY() , myh->GetYaxis()->GetBinLowEdge(1) , myh->GetYaxis()->GetBinLowEdge( myh->GetNbinsY()+1) );
 
-		TH1D * htrimmeanvsX_special = nullptr; 
-	  if(h==0 || h==771){	
-		htrimmeanvsX_special = new TH1D(htrimmeanvsXname_special,"", myh->GetNbinsY() , myh->GetYaxis()->GetBinLowEdge(1) , myh->GetYaxis()->GetBinLowEdge( myh->GetNbinsY()+1)) ; }
     /*
 		  //Get the rechit ADC charge distribution integrated over all values of the variable of interest
 			//    TH1D* projall = myh->ProjectionX("_px",0, myh->GetNbinsY(), h, h) ;  
@@ -800,8 +689,8 @@ vector < std::pair<double, double > >  pressure_dependence_removal::GetSlope( TH
 			gStyle->SetOptStat(111111211);
 			my_hist->Draw();
 			my_hist->SetTitle("charge : channel "+rhidshort);
-			c_individual->SaveAs(output_plots_folder+"plotfolder_"+chamber_string_name+"/attempt_first_int_lum_bin_channel_"+rhidshort+".pdf"); */
-
+			c_individual->SaveAs(output_plots_folder+"plotfolder_"+chamber_string_name+"/attempt_first_int_lum_bin_channel_"+rhidshort+".pdf"); 
+*/
     for(int j = 1; j <= myh->GetNbinsY(); j++){
       TH1D* proj = (h==0 || h==771)? (TH1D*) (myh->ProjectionX("_px",j,j,1,1))->Clone() : (TH1D*)(myh->ProjectionX("_px",j,j,h,h))->Clone();  
 			TString bin_nb = TString::Format("%d",j);
@@ -904,15 +793,15 @@ vector < std::pair<double, double > >  pressure_dependence_removal::GetSlope( TH
 						   	}*/
 								normal = h_prov_new->Integral();
 
+			   				proj->Add(h_prov_new,1./normal);// to each channel we normalize with respect to total integral acroos the channel , not wrt only trimmed mean integral
 								// new addition for evaluating mean based on individual channel
-								if(h==0) {  mean_values<<" mean of the trimmed histogram before : rhid "<<rhidshort<<" mean "<<h_prov->GetMean()<<" error "<<h_prov->GetMeanError()<<"after trimming "<<h_prov_new->GetMean()<<" error "<<h_prov_new->GetMeanError()<<std::endl; }
+			//					if(h==0) {  mean_values<<" mean of the trimmed histogram before : rhid "<<rhidshort<<" mean "<<h_prov->GetMean()<<" error "<<h_prov->GetMeanError()<<"after trimming "<<h_prov_new->GetMean()<<" error "<<h_prov_new->GetMeanError()<<std::endl; }
 														//new_mean_positive->Fill(h_prov_new->GetMean(),1./h_prov_new->GetMeanError());}
-								if(h==771) {mean_values<<" mean of the trimmed histogram before : rhid "<<rhidshort<<"mean "<<h_prov->GetMean()<<" error "<<h_prov->GetMeanError()<<"after trimming "<<h_prov_new->GetMean()<<" error "<<h_prov_new->GetMeanError()<<std::endl; }
+			//					if(h==771) {mean_values<<" mean of the trimmed histogram before : rhid "<<rhidshort<<"mean "<<h_prov->GetMean()<<" error "<<h_prov->GetMeanError()<<"after trimming "<<h_prov_new->GetMean()<<" error "<<h_prov_new->GetMeanError()<<std::endl; }
 									//new_mean_negative->Fill(h_prov_new->GetMean(),1./h_prov_new->GetMeanError());}
 //						   std::cout<<" integral individual channel before trimming  "<<rhidshort<<"for channel "<<ichan<<" : "<<h_prov->Integral()<<" after trimming "<<h_prov_new->Integral()<<std::endl;
 							//	if(debug_statements) std::cout<<" integral of projection adding to allgoodchannels "<<rhidshort<<"for channel "<<ichan<<" : "<<normal<<" final events "<<added_events<<std::endl;
 					
-			   				proj->Add(h_prov_new,1./normal);// to each channel we normalize with respect to total integral acroos the channel , not wrt only trimmed mean integral
 
             // adding one more if condition to make plots for plus endcap and minus endcap separately 
   		          delete h_prov;
@@ -998,7 +887,7 @@ vector < std::pair<double, double > >  pressure_dependence_removal::GetSlope( TH
 			 TString title_for_proj = rhidshort+" : "+thevar+" : bin : "+j;
 			 proj->SetTitle(title_for_proj);
 //		  if(debug_statements) std::cout<<" rhid channel "<<rhidshort<<" bin number "<<j<<" Integral "<<h_trim->Integral()<<" value of mean after trimming "<<h_trim->GetMean()<<" Error on mean "<<h_trim->GetMeanError()<<std::endl;
-/*    	 if(proj->Integral()>0 && (thevar.Index("pressure")>=0 || thevar.Index("integratelumi")>=0) && savehistos && (rhidshort.Contains("chamber1") || rhidshort.Contains("allgoodchannels")) && (j==11 || j==12 || j==8) ){
+    	 if(proj->Integral()>0 && (thevar.Index("pressure")>=0 || thevar.Index("integratelumi")>=0) && savehistos && (rhidshort.Contains("chamber1") || rhidshort.Contains("allgoodchannels")) && (j==11 || j==12 || j==8) ){
 //    	 if(h_trim->Integral()>0 && (thevar.Index("timesecond")>=0) && savehistos && (rhidshort="chamber1"||rhidshort="chamber1" ||rhidshort="chamber558" ||rhidshort="chamber556") || rhidshort.Contains("allgoodchannels")) && (j==11 || j==12) ){
           std::cout<<"  entred in plots *******************************************************************"<<std::endl;
          
@@ -1008,7 +897,7 @@ vector < std::pair<double, double > >  pressure_dependence_removal::GetSlope( TH
 	    	 proj->Draw("E");
  			 	 canvas_charge->SaveAs(output_plots_folder+"plotfolder_"+chamber_string_name+"/charge_distribution"+title+"_"+rhidshort+"vs"+thevar+"_bin"+j+"_channel"+h+"_before_trim.pdf"); 
 			 }
-
+/*
     	 if(proj->Integral()>0 && (thevar.Index("pressure")>=0 || thevar.Index("integratelumi") >=0) && savehistos && (rhidshort.Contains("chamber1") || rhidshort.Contains("allgoodchannels")) && (j==11 || j==12 || j==8) ){
     	 //if(h_trim_new->Integral()>0 && (thevar.Index("integratelumi")>=0 || thevar.Index("pressure")>=0) && savehistos ){
 			 	 TCanvas *canvas_charge = new TCanvas();
@@ -1070,10 +959,6 @@ vector < std::pair<double, double > >  pressure_dependence_removal::GetSlope( TH
        htrimmeanvsX->SetBinContent(j, h_trim_new->GetMean() ); 
      	 htrimmeanvsX->SetBinError(j, h_trim_new->GetMeanError() ) ; 
 
-			 if(h==0 || h==771){
-			 htrimmeanvsX_special->SetBinContent(j, gas_gain ); 
-     	 htrimmeanvsX_special->SetBinError(j, gas_gain_error ) ; 
-			 }
 
         delete proj;
         delete h_trim_new;
@@ -1113,8 +998,13 @@ vector < std::pair<double, double > >  pressure_dependence_removal::GetSlope( TH
     gStyle->SetOptStat("001111111");
 		//Defines the range for the fit,    
     double fitlowedge (0), fithighedge(44);
-    if( thevar.Index("pressure")>=0 ) fitlowedge = 950; 
-    if( thevar.Index("pressure")>=0 ) fithighedge = 972 ;
+    if(dir_name_var.Index("pressure_2016") >=0  ) fitlowedge = 960; 
+    if(dir_name_var.Index("pressure_2017") >=0  ) fitlowedge = 950; 
+    if(dir_name_var.Index("pressure_2018") >=0  ) fitlowedge = 960; 
+    if(dir_name_var.Index("pressure_2016") >=0  ) fithighedge = 973; 
+    if(dir_name_var.Index("pressure_2017") >=0  ) fithighedge = 972; 
+    if(dir_name_var.Index("pressure_2018") >=0  ) fithighedge = 975; 
+
     if( thevar.Index("instlumi")>=0 ) fitlowedge = 2000; 
     if( thevar.Index("instlumi")>=0 ) fithighedge =12000 ;
 
@@ -1143,7 +1033,7 @@ vector < std::pair<double, double > >  pressure_dependence_removal::GetSlope( TH
 			if(htrimmeanvsX->Integral()>0) {
 				htrimmeanvsX->Write();
 			}
-      htrimmeanvsX->Draw();
+      //htrimmeanvsX->Draw();
 
 			// Jus tthe same thing for a special plot with mean taken from gaussian distribution 
 /*		if(h==0 || h==771){
@@ -1252,60 +1142,59 @@ vector < std::pair<double, double > >  pressure_dependence_removal::GetSlope( TH
 
 		//	std::cout<<" issue before ending the loop :  "<<thevar<<std::endl;
   	delete htrimmeanvsX;
-  	delete htrimmeanvsX_special;
       delete c3;
 
 		
-			if(thevar.Index("instlumi")>=0 ||thevar.Index("pressure")>=0   ){ 
-			double theslope = fa1->GetParameter(1);
-			double unc_slope = fa1->GetParError(1);
-			double chi2overN = (fa1->GetNDF () >0)? (fa1->GetChisquare ()/fa1->GetNDF () ) : -10 ; 
-			
+//			if(thevar.Index("instlumi")>=0 ||thevar.Index("pressure")>=0   ){ 
+//			double theslope = fa1->GetParameter(1);
+//			double unc_slope = fa1->GetParError(1);
+//			double chi2overN = (fa1->GetNDF () >0)? (fa1->GetChisquare ()/fa1->GetNDF () ) : -10 ; 
+//			
 /*			if( thevar.Index("instlumi") >=0&& theslope>0.00001 )    {
      if( thevar.Index("instlumi") >=0 ) {std::cout<<" **************************************tifying if outlier exists "<<thevar<<" slopes "<<theslope<<" rhid "<<rhidshort<<std::endl;}
 		c3->SaveAs(output_plots_folder+"plotfolder_"+chamber_string_name+"/outliers_trimmean"+title+"_"+rhidshort+"vs"+thevar+".pdf"); } */
 
-		if(h==0){
-   		_slope_goodchannels_plus=theslope;
-   		_slope_error_goodchannels_plus=unc_slope;
-   		theouttree_goodchannels->Fill();
-		}
-
-		if(h==771){
-   		_slope_goodchannels_minus=theslope;
-   		_slope_error_goodchannels_minus=unc_slope;
-   		theouttree_goodchannels->Fill();
-		}
-    
-   if( theslope  !=0 && h!=0 && h!=771){
-      h_slope->Fill(theslope);
-      h_slopeuncty->Fill(unc_slope);
-      h_chi2->Fill(chi2overN) ;
-   }
-
-    if( theslope  !=0 && h!=0 && h!=771 ){
-      int chambandlay = (h>400)? (h-400) : h; 
-      _slope =theslope;
-			//_slope_error =fa1->GetParError(1);
-      _slope_error =unc_slope;
-      _chi2 =fa1->GetChisquare () ;
-      _ndof = fa1->GetNDF ();
-      _chamber = (int) floor( chambandlay/10 ) ; 
-      _layer = h%10 ;
-      _endcap = (int)floor( h/400 ) +1 ;
-      _stationringHVseg =  thestationringhv(filename);
-      _isbadchannel = false; // isbadchannel("ME11",h,_runNb);
-      theouttree->Fill();
-     } 
-		}//end of if condition for  writing tree for instlumi and intlumi parameters  
+//		if(h==0){
+//   		_slope_goodchannels_plus=theslope;
+//   		_slope_error_goodchannels_plus=unc_slope;
+//   		theouttree_goodchannels->Fill();
+//		}
+//
+//		if(h==771){
+//   		_slope_goodchannels_minus=theslope;
+//   		_slope_error_goodchannels_minus=unc_slope;
+//   		theouttree_goodchannels->Fill();
+//		}
+//    
+//   if( theslope  !=0 && h!=0 && h!=771){
+//      h_slope->Fill(theslope);
+//      h_slopeuncty->Fill(unc_slope);
+//      h_chi2->Fill(chi2overN) ;
+//   }
+//
+//    if( theslope  !=0 && h!=0 && h!=771 ){
+//      int chambandlay = (h>400)? (h-400) : h; 
+//      _slope =theslope;
+//			//_slope_error =fa1->GetParError(1);
+//      _slope_error =unc_slope;
+//      _chi2 =fa1->GetChisquare () ;
+//      _ndof = fa1->GetNDF ();
+//      _chamber = (int) floor( chambandlay/10 ) ; 
+//      _layer = h%10 ;
+//      _endcap = (int)floor( h/400 ) +1 ;
+//      _stationringHVseg =  thestationringhv(filename);
+//      _isbadchannel = false; // isbadchannel("ME11",h,_runNb);
+//      theouttree->Fill();
+//     } 
+//		}//end of if condition for  writing tree for instlumi and intlumi parameters  
   
 
 	} //end of loop for all the channelss 
   
-  if( thevar.Index("instlumi")>=0  ) h_slope->GetXaxis()->SetTitle("Slope of #Delta Q vs instant Luminosity (/#mu b^{-1} s^{-1})");
-  if( thevar.Index("time")>=0  ) h_slope->GetXaxis()->SetTitle("Slope of #Delta Q vs time");
-  if( thevar.Index("integrate")>=0  ) h_slope->GetXaxis()->SetTitle("Slope of #Delta Q vs #int L (/fb^{-1})");
-  if( thevar.Index("pressure")>=0  )  h_slope->GetXaxis()->SetTitle("Slope of #Delta Q vs P (hPa^{-1})");
+//  if( thevar.Index("instlumi")>=0  ) h_slope->GetXaxis()->SetTitle("Slope of #Delta Q vs instant Luminosity (/#mu b^{-1} s^{-1})");
+//  if( thevar.Index("time")>=0  ) h_slope->GetXaxis()->SetTitle("Slope of #Delta Q vs time");
+//  if( thevar.Index("integrate")>=0  ) h_slope->GetXaxis()->SetTitle("Slope of #Delta Q vs #int L (/fb^{-1})");
+//  if( thevar.Index("pressure")>=0  )  h_slope->GetXaxis()->SetTitle("Slope of #Delta Q vs P (hPa^{-1})");
 
 //	if(thevar.Index("integratelumi_initial")<0)  {
 //	outf = TFile::Open();
@@ -1348,3 +1237,42 @@ double pressure_dependence_removal::ApplyCorrection( double X ,TString correctio
   
   return 1;
 }
+
+double pressure_dependence_removal::NominalHV(){
+
+    std::pair<double,double> chargeandHV(0,0);
+    double dHV_(0),HV_(0);
+  if(_stationring ==11 || _stationring ==14){
+
+    if( _stationring ==14) _rhid -=30000 ;
+    _rhid -= _rhid%10; _rhid/=10;
+
+    dHV_ = (dHV_HV_ME11(_rhid) ).first;
+    HV_ = (dHV_HV_ME11(_rhid) ).second;
+    
+  }
+  else if(_runNb>= 281613){
+    dHV_ = (dHV_HV_NonME11_v2(_rhid) ).first;
+    HV_ = (dHV_HV_NonME11_v2(_rhid) ).second;
+  } 
+  else{
+    dHV_ = (dHV_HV_NonME11_v1(_rhid) ).first;
+    HV_ = (dHV_HV_NonME11_v1(_rhid) ).second;
+  }  
+
+  // all ME11 set to 2900 V and nonME11 to 3600 V
+  if( _runNb <277792 ){HV_ -=  dHV_; dHV_=0;}
+  
+  // all ME11 set to 2900 V , non ME11 have new values
+  if( _runNb < 281613&& (_stationring==11|| _stationring ==14)  ){HV_ -=  dHV_; dHV_=0;}
+
+  // all ME11 above 281613 have new values and all non ME11 above 277792 have new values
+  else if(_runNb >= 324077 && (_stationring==11|| _stationring ==14))  { HV_= HV_ -32 ; dHV_= dHV_-32; }
+  // all ME11 in 2018 now have correct values 
+   // Non ME11 outer rings voltage was lowered by 35V
+  // ME12, ME13, ME22, ME32, ME42 
+  else if(_runNb >= 324077 && (_stationring==12|| _stationring ==13|| _stationring ==22|| _stationring ==32|| _stationring ==42))  { HV_= HV_ -    35 ; dHV_= dHV_-35; }
+
+  return HV_;
+}
+
