@@ -61,7 +61,7 @@ _rhsumQ: ADC charge, undoing the HV changes made in the latest data
 (By running the above code, or the same code in the script "single_file_2022.sh" we get final 32 output files, one for each HV segment)
 .
 
-# Extracting Gas gain dependency. 
+# Extracting Gas gain dependency 
 This is done with a C++ class ( ProduceHistosPerChannel) 
 Assuming you have the file final_ME21HV1.root in the subfolder Work, do: 
 ```
@@ -73,3 +73,19 @@ d.Loop("final_ME21HV1")
 //No ".root" extension 
 
 The resulting output file will then contain histograms with all fits, as well as the slope distribution for each variable studied in a single histogram. 
+
+# Extracting pressure dependence removed ntuples for a chamber ie. to run pressure_dependence_removal.C program
+Use the program : "running_produceHistos.C"
+```
+  #include "/afs/cern.ch/work/n/nrawal/CSCAgeing_code_study/code_area/Src/pressure_dependence_removal.C+"
+  void running_produceHistos(TString input_file_path,TString input_file_name,TString input_chamber, TString output_file_path    , TString output_path_folder){
+  pressure_dependence_removal  m;
+  m.Loop(input_file_path,input_file_name,  input_chamber, output_file_path, output_path_folder);
+  std::cout<<" finished the loop "<<std::endl; 
+  }
+```
+Run the above program using : the command :  
+```
+root -l -b -q 'running_test.C("/eos/home-n/nrawal/CSCAgeing/Run2_combine/", "csc_output_run2_ME21HV1_tree_HV_updated.root"    ,"ME21HV1", "/afs/cern.ch/user/n/nrawal/work/CSCAgeing_code_study/applying_correction/", "/afs/cern.ch/user/n/nrawal/work/    CSCAgeing_code_study/applying_correction/plotfolder/")'
+```
+
