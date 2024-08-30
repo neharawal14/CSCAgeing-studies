@@ -1,15 +1,26 @@
 #ifndef ROOT_AnalysisGasGain
 #define ROOT_AnalysisGasGain
-
 #include "HistMan.h"
+#include <vector>
 #include "TTree.h"
-
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <string>
+#include <sstream>
+#include "TTree.h"
+#include "TFile.h"
+#include "TLorentzVector.h"
+#include <limits>
+#include <map>
+using namespace std;
 class AnalysisGasGain : public TObject {
 
 private:
 
   string  ntuplename;      // input ntuple file
   string  histrootname;    // output ROOT file with hists
+	string year;
 
   Int_t nentries;          // Tree entries
   Int_t entries_analyzed;  // # of analyzed entries
@@ -109,6 +120,7 @@ private:
   double _rhsumQ;
   double _rhsumQ_RAW;
   double _HV;
+  double _current;
   double _pressure;
   double _temperature;
   double _instlumi;
@@ -117,6 +129,7 @@ private:
   Int_t _n_PV;
   Int_t _bunchcrossing;
   Bool_t passZmumusel;
+  Bool_t passisomuondzdxy;
   double _ptmuon;
   double _etamuon;
   double _phimuon;
@@ -130,7 +143,7 @@ public:
   AnalysisGasGain();
   virtual ~AnalysisGasGain();
 
-  void Setup(Int_t,Int_t,string,string);
+  void Setup(Int_t,Int_t,string,string, string);
 
   void SetupPrint();
   void SetupTree();

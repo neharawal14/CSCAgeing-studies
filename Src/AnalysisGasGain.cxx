@@ -1,17 +1,11 @@
+#include "HistMan.h"
 #include "AnalysisGasGain.h"
-#include <iostream>
-#include <fstream>
-#include <iomanip>
-#include <string>
-#include <sstream>
-#include "TTree.h"
-#include "TFile.h"
-#include "TLorentzVector.h"
-#include <limits>
-#include <map>
-#include "pressurecsc_2022.h"
-#include "IntegrateLumi_2022.h"
-
+#include "pressurecsc_2016.h"
+#include "IntegrateLumi_2016.h"
+#include "pressurecsc_2017.h"
+#include "IntegrateLumi_2017.h"
+#include "pressurecsc_2018.h"
+#include "IntegrateLumi_2018.h"
 #include "ChargeORIGandInstL.h"
 ClassImp(AnalysisGasGain)
 
@@ -54,12 +48,13 @@ AnalysisGasGain::~AnalysisGasGain() { }
 
 /* **************************** Setup ************************************* */
 
-void AnalysisGasGain::Setup(Int_t fstat,Int_t fprint,string inp,string out)
+void AnalysisGasGain::Setup(Int_t fstat,Int_t fprint,string inp,string out, string year_string)
 {
   flag_stat=fstat;
   flag_print=fprint;
   ntuplename=inp;
   histrootname=out;
+	year = year_string;
  if(debug_bool) std::cout<<"starting setup"<<std::endl;
   Int_t strng[10]={11,12,13,14,21,22,31,32,41,42};
   m_ordstatring.clear();
@@ -150,6 +145,7 @@ void AnalysisGasGain::SetupTree(){
     outputtree[i] = new TTree("tree","tree");
 		if(debug_bool) std::cout<<" branches to be declared for all the segments"<<std::endl;
     outputtree[i]->Branch("_passZmumusel",   &passZmumusel,   "_passZmumusel/O");
+    outputtree[i]->Branch("_passisomuondzdxy",   &passisomuondzdxy,   "_passisomuondzdxy/O");
 		if(debug_bool) std::cout<<" rest of the branches to be declared for all the segments"<<std::endl;
   outputtree[i]->Branch("_eventNb",   &_eventNb,   "_eventNb/l");
   outputtree[i]->Branch("_runNb",   &_runNb,   "_runNb/l");
@@ -159,6 +155,7 @@ void AnalysisGasGain::SetupTree(){
   outputtree[i]->Branch("_rhsumQ",&_rhsumQ,"_rhsumQ/D");
   outputtree[i]->Branch("_rhsumQ_RAW",&_rhsumQ_RAW,"_rhsumQ_RAW/D");
   outputtree[i]->Branch("_HV",&_HV,"_HV/D");
+  outputtree[i]->Branch("_current",&_current,"_current/D");
   outputtree[i]->Branch("_pressure",&_pressure,"_pressure/D");
   outputtree[i]->Branch("_temperature",&_temperature,"_temperature/D");
   outputtree[i]->Branch("_instlumi",&_instlumi,"_instlumi/D");
@@ -452,7 +449,7 @@ void AnalysisGasGain::GetTracks(HistMan* histos) {
      ostringstream ss;
      if(m_Single_cscSegments_recHitRecordX.size() > 0) {//There should be at least one single segment in a chamber
 
-     Int_t trackne=0;  // non empty track counter, e.g. track with CSC segments
+     Int_t trackne=0;  //  e.g. it gives us the number of muons in an event which have CSC segments
      for(UInt_t i=0;i<fmuons_cscSegmentRecord_nRecHits->size();i++) //Loop over muons
         if(i<10 && (*fmuons_cscSegmentRecord_nRecHits)[i].size() > 0) 
 	 // i< 10 due to use in key for map
@@ -460,11 +457,11 @@ void AnalysisGasGain::GetTracks(HistMan* histos) {
 
      histos->fill1DHist((Float_t)trackne,"nonempty_tracks_per_event","","Number of non empty tracks per event","Entires",4,10,0.0,10.0,1.0,"Test");
 
-     if(trackne == 1) { // use events with single muon track
+     //// New commented off by Neha // if(trackne == 1) { // use events with single muon
      Int_t trackneindmx=0;
 
      for(UInt_t i=0;i<fmuons_cscSegmentRecord_nRecHits->size();i++) {
-       if(i<10 && (*fmuons_cscSegmentRecord_nRecHits)[i].size() > 0   && (fmuons_Zcand[i] || fmuons_isomuondzdxy[i] )) {//Last part added by Laurent
+       if(i<10 && (*fmuons_cscSegmentRecord_nRecHits)[i].size() > 0   && (fmuons_Zcand[i] && fmuons_isomuondzdxy[i] )) {//Last part added by Laurent
 	 // i< 10 due to use in key for map
           histos->fill1DHist((Float_t)(*fmuons_cscSegmentRecord_nRecHits)[i].size(),"segments_per_track","","Number of CSC segments per track","Entries",4,10,0.0,10.0,1.0,"Test");
          if((Int_t)i>trackneindmx) trackneindmx=(Int_t)i;
@@ -553,7 +550,7 @@ void AnalysisGasGain::GetTracks(HistMan* histos) {
      if(m_cscSegments_single_trk_recHitRecord.size() > 0) 
        histos->fill1DHist((Float_t)m_cscSegments_single_trk_recHitRecord.size(),"single_segm_rechits_trk_per_event","","Track single segment hits per event","Entries",4,100,0.0,100.0,1.0,"Test");
      if(m_muon_segm.size() > 0) histos->fill1DHist((Float_t)m_muon_segm.size(),"single_segm_tracks_per_event","","# of single track_segments per event","Entires",4,20,0.0,20.0,1.0,"Test");
-     } // end of if single muon track per event (trackne==1)
+     //// new commented off by Neha } // end of if single muon track per event (trackne==1)
      } // end of    if(m_Single_cscSegments_recHitRecordX.size() > 0) 
 	   if(debug_bool) std::cout<<" ending Get Tracks "<<std::endl;
 }
@@ -711,6 +708,7 @@ ostringstream ss;
 	    //	    cout << "run, sumq, stationring, rhid: " << fRun <<", "<<sumq<<", "<<_stationring<<", "<<_rhid <<endl;
 	    _rhsumQ =  gasgainandhv.first;
 	    _HV =  gasgainandhv.second;
+	    _current = 0;
 
 	    int iregion = GetRegionIdx(station,ring,hvsgm);
 			if(debug_bool_region)std::cout<<" value of the region in each rechit "<<iregion<<" charge "<<_rhsumQ<<" event Nb"<<_eventNb<<" hv segment "<<hvsgm<<std::endl;
@@ -808,6 +806,22 @@ void AnalysisGasGain::CycleTree(HistMan* histos) {
   b_recHits2D_localY->SetAddress(frecHits2D_localY);
   b_recHits2D_SumQ->SetAddress(frecHits2D_SumQ); 
 
+//  b_cscSegments_recHitRecord_endcap->SetAddress(fcscSegments_recHitRecord_endcap);
+//  b_cscSegments_recHitRecord_station->SetAddress(fcscSegments_recHitRecord_station);
+//  b_cscSegments_recHitRecord_ring->SetAddress(fcscSegments_recHitRecord_ring);
+//  b_cscSegments_recHitRecord_chamber->SetAddress(fcscSegments_recHitRecord_chamber);
+//  b_cscSegments_recHitRecord_layer->SetAddress(fcscSegments_recHitRecord_layer);
+//  b_cscSegments_recHitRecord_localX->SetAddress(fcscSegments_recHitRecord_localX);
+//  b_cscSegments_recHitRecord_localY->SetAddress(fcscSegments_recHitRecord_localY);
+//
+//  b_muons_cscSegmentRecord_nRecHits->SetAddress(fmuons_cscSegmentRecord_nRecHits);
+//  b_muons_cscSegmentRecord_endcap->SetAddress(fmuons_cscSegmentRecord_endcap);
+//  b_muons_cscSegmentRecord_station->SetAddress(fmuons_cscSegmentRecord_station);
+//  b_muons_cscSegmentRecord_ring->SetAddress(fmuons_cscSegmentRecord_ring);
+//  b_muons_cscSegmentRecord_chamber->SetAddress(fmuons_cscSegmentRecord_chamber);
+//  b_muons_cscSegmentRecord_localX->SetAddress(fmuons_cscSegmentRecord_localX);
+//  b_muons_cscSegmentRecord_localY->SetAddress(fmuons_cscSegmentRecord_localY);
+
   b_cscSegments_recHitRecord_endcap->SetAddress(&fcscSegments_recHitRecord_endcap);
   b_cscSegments_recHitRecord_station->SetAddress(&fcscSegments_recHitRecord_station);
   b_cscSegments_recHitRecord_ring->SetAddress(&fcscSegments_recHitRecord_ring);
@@ -832,21 +846,21 @@ void AnalysisGasGain::CycleTree(HistMan* histos) {
   b_muons_dxy->SetAddress(fmuons_dxy);
   b_muons_isoCH03->SetAddress(fmuons_isoCH03);
 	if(debug_bool) std::cout<<"setted addresses for all the  branch "<<std::endl;
-  fcscSegments_recHitRecord_endcap  = 0; 
-  fcscSegments_recHitRecord_station = 0; 
-  fcscSegments_recHitRecord_ring    = 0;  
-  fcscSegments_recHitRecord_chamber = 0; 
-  fcscSegments_recHitRecord_layer   = 0; 
-  fcscSegments_recHitRecord_localX  = 0; 
-  fcscSegments_recHitRecord_localY  = 0;
+fcscSegments_recHitRecord_endcap  = 0; 
+fcscSegments_recHitRecord_station = 0; 
+fcscSegments_recHitRecord_ring    = 0;  
+fcscSegments_recHitRecord_chamber = 0; 
+fcscSegments_recHitRecord_layer   = 0; 
+fcscSegments_recHitRecord_localX  = 0; 
+fcscSegments_recHitRecord_localY  = 0;
 
-  fmuons_cscSegmentRecord_nRecHits  = 0;
-  fmuons_cscSegmentRecord_endcap    = 0;
-  fmuons_cscSegmentRecord_station   = 0;
-  fmuons_cscSegmentRecord_ring      = 0;
-  fmuons_cscSegmentRecord_chamber   = 0;
-  fmuons_cscSegmentRecord_localY    = 0;
-  fmuons_cscSegmentRecord_localX    = 0;
+fmuons_cscSegmentRecord_nRecHits  = 0;
+fmuons_cscSegmentRecord_endcap    = 0;
+fmuons_cscSegmentRecord_station   = 0;
+fmuons_cscSegmentRecord_ring      = 0;
+fmuons_cscSegmentRecord_chamber   = 0;
+fmuons_cscSegmentRecord_localY    = 0;
+fmuons_cscSegmentRecord_localX    = 0;
 
 
   // *********************************************
@@ -918,8 +932,11 @@ for(Int_t ient=0;ient<nentries;ient++) {
      m_cscSegments_single_trk_recHitRecord.clear();
      m_cscSegments_single_trk_recHitRecord_final.clear();
 
-     _pressure = getpressure2022(ftimeSecond);
-     _temperature =0;
+    if(year=="2016")  _pressure = getpressure2016(ftimeSecond);
+		else if(year=="2017")  _pressure = getpressure2017(ftimeSecond);
+		else if(year=="2018")  _pressure = getpressure2018(ftimeSecond);
+
+		_temperature =0;
      
 
   if(debug_bool)  std::cout<<"loading of branches done`"<<std::endl;
@@ -929,7 +946,7 @@ for(Int_t ient=0;ient<nentries;ient++) {
 			 fmuons_Zcand[iM] = false; fmuons_isomuondzdxy[iM] = false;}
      //Skim: 2 muons pt 10, 70<M(mumu)<110
      passZmumusel= false;
-     bool passisomuondzdxy = false;
+     passisomuondzdxy = false;
      double mass =-1;
 
        if(debug_bool) std::cout<<"enteing the loop for checking each muon entry"<<std::endl;
@@ -965,7 +982,8 @@ for(Int_t ient=0;ient<nentries;ient++) {
        }
      }
 
-     if(!passZmumusel&& !passisomuondzdxy) continue;
+			if(passisomuondzdxy ==false) continue;
+			if(passZmumusel ==false) continue;
 
 //		 if(fRun == 302448 ) {std::cout<<" these runs  started processing and done "<<fRun<<std::endl; }
 
@@ -977,10 +995,24 @@ for(Int_t ient=0;ient<nentries;ient++) {
     //if(fRun != 302388) continue;    
 
      if(runnb_previous_event != fRun ||   lumis_previous_event !=  fLumiSect)   _instlumi =instlumi(fRun, fLumiSect) ;
-     
-     if(runnb_previous_event != fRun ) _integratelumi = integlumi2022(fRun);
-     
-     
+    
+		float intlumi_to_add; 
+     if(runnb_previous_event != fRun )
+			{ 
+				if(year=="2016") {
+					intlumi_to_add  = 0;
+					_integratelumi = integlumi_2016(fRun) + intlumi_to_add;
+				}
+				else if(year=="2017") {
+					intlumi_to_add = 39.32673126400002;
+				 	_integratelumi = (integlumi_2017(fRun)/1000.0)+intlumi_to_add;
+				}
+				else if(year=="2018") {
+					 intlumi_to_add = 39.32673126400002 + 44.52667700172356; 
+					_integratelumi = integlumi_2018(fRun)+ intlumi_to_add;
+				}
+			}
+              
      if(debug_bool) std::cout<<" going for the event   "<<fRun<<std::endl; 
      runnb_previous_event =fRun; 
      lumis_previous_event =  fLumiSect ;
