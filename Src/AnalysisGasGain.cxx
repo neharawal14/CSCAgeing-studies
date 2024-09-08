@@ -35,11 +35,10 @@ std::map <Int_t, std::vector <Double_t> >
                             m_cscSegments_single_trk_recHitRecord_final;
 
 int minhitpersegment = 5;
-
+bool debug_new = true;
 bool debug_bool = false;
 bool debug_bool_region = false;
 bool debug_program = false;
-bool debug_first = false ;
 
 // Important note : Endcap =1 => Plus Endcap , Endcap =2 => Minus Endcap
 AnalysisGasGain::AnalysisGasGain() { }
@@ -345,13 +344,14 @@ void AnalysisGasGain::GetSegments(HistMan* histos) {
 
      Int_t nhits_segm_event=0;
      for(UInt_t i=0;i<fcscSegments_recHitRecord_endcap->size();i++) {
-
+      std::cout<<" for the event "<<_eventNb<<" segments number "<<fcscSegments_recHitRecord_endcap->size()<<std::endl;
+      std::cout<<" number of hits "<<(*fcscSegments_recHitRecord_endcap)[i].size()<<std::endl;
         if(i<100) { // limit 100 segments per event for key_segment
 
 	  histos->fill1DHist((Float_t)(*fcscSegments_recHitRecord_endcap)[i].size(),"all_hits_per_segment","","All hits per segment","Entries",4,10,0.0,10.0,1.0,"Test");
           // use segments with hits in 4-6 layers only
 	  
-	  if((Int_t)(*fcscSegments_recHitRecord_endcap)[i].size() >= minhitpersegment ) {
+//	  if((Int_t)(*fcscSegments_recHitRecord_endcap)[i].size() >= minhitpersegment ) {
 	    
             for(UInt_t j=0;j<(*fcscSegments_recHitRecord_endcap)[i].size();j++) {
 	    // here i-segment,j-hit
@@ -363,9 +363,8 @@ void AnalysisGasGain::GetSegments(HistMan* histos) {
             Double_t localX=(*fcscSegments_recHitRecord_localX)[i][j];
             Double_t localY=(*fcscSegments_recHitRecord_localY)[i][j];
 
-
-
             UInt_t key_segment=1000000*endcap+100000*station+10000*ring+100*chamber+i;
+            std::cout<<" key segment from segment "<<key_segment<<" layer "<<layer<<std::endl;
 	    if(j==0) {
               nhits_segm_event=nhits_segm_event+(Int_t)(*fcscSegments_recHitRecord_endcap)[i].size();
               Int_t key_chamber=(Int_t)(key_segment/100);
@@ -384,7 +383,7 @@ void AnalysisGasGain::GetSegments(HistMan* histos) {
             m_cscSegments_recHitRecordY[key_segment][layer-1]=localY;
 
 	    } // end of  for(UInt_t j=0;j<fcscSegments_recHitRecord_endcap[i]
-	  } // end of if segment has >=minhitpersegment layers in it
+	  //} // end of if segment has >=minhitpersegment layers in it
 	}   // end of if there is < 100 segments
      } // end of for(UInt_t i=0;i<fcscSegments_recHitRecord_endcap->size();i++)
  
@@ -402,7 +401,7 @@ void AnalysisGasGain::GetSegments(HistMan* histos) {
 
      if(m_nsegments_chamber.size() > 0 ) {
      for(UInt_t i=0;i<fcscSegments_recHitRecord_endcap->size();i++) {
-       if((Int_t)(*fcscSegments_recHitRecord_endcap)[i].size() >= minhitpersegment ) { 
+      // if((Int_t)(*fcscSegments_recHitRecord_endcap)[i].size() >= minhitpersegment ) { 
         Int_t endcap=(Int_t)(*fcscSegments_recHitRecord_endcap)[i][0];
         Int_t station=(Int_t)(*fcscSegments_recHitRecord_station)[i][0];
         Int_t ring=(Int_t)(*fcscSegments_recHitRecord_ring)[i][0];
@@ -414,31 +413,34 @@ void AnalysisGasGain::GetSegments(HistMan* histos) {
         if(m_nsegments_chamber.find(key_chmb)==m_nsegments_chamber.end())
           cout<<"Error, no segments for key_chmb="<<key_chmb<<" event "<<fEvent<<endl;
         if(m_nsegments_chamber.find(key_chmb)!=m_nsegments_chamber.end()) {
-          if(m_nsegments_chamber[key_chmb]==1) {
+          // For now let's not just count single segment chambers but everything
+           //if(m_nsegments_chamber[key_chmb]==1) {
 	    if(m_Single_cscSegments_recHitRecordX.find(key_chmb) == m_Single_cscSegments_recHitRecordX.end()) { 
 	      UInt_t key_segment=1000000*endcap+100000*station+10000*ring+100*chamber+i;  
               if(m_cscSegments_recHitRecordX.find(key_segment)== m_cscSegments_recHitRecordX.end()) cout<<"Error: no m_cscSegments_recHitRecordX with key_segment="<<key_segment<<endl;
-              if(m_cscSegments_recHitRecordX.find(key_segment)!= m_cscSegments_recHitRecordX.end()) { 
+              if(m_cscSegments_recHitRecordX.find(key_segment)!= m_cscSegments_recHitRecordX.end()) {
 		m_Single_cscSegments_recHitRecordX[key_chmb]=m_cscSegments_recHitRecordX[key_segment];
 		m_Single_cscSegments_recHitRecordY[key_chmb]=m_cscSegments_recHitRecordY[key_segment];
+                std::cout<<" the single csc segment with value : key chamber : "<<key_chmb<<" segment "<<key_segment<<std::endl; 
 
 	      }  // end of if(m_cscSegments_recHitRecordX.find(key_segment)
 	    }   // end of if(m_Single_cscSegments_recHitRecordX.find(key_chmb)
-	  }  // end of if(m_nsegments_chamber[key_chmb]==1)
+	  // }  // end of if(m_nsegments_chamber[key_chmb]==1)
 	}   // end of if(m_nsegments_chamber.find(key_chmb)!
-       } // end of if((Int_t)(*fcscSegments_recHitRecord_endcap)[i].size() >=minhitpersegment )
+      // } // end of if((Int_t)(*fcscSegments_recHitRecord_endcap)[i].size() >=minhitpersegment )
      }  // end of for(UInt_t i=0;i<fcscSegments_recHitRecord_endcap->size()
      }  // end if(m_nsegments_chamber.size() > 0 
  
      if(m_Single_cscSegments_recHitRecordX.size() > 0) {
-       histos->fill1DHist((Float_t)m_Single_cscSegments_recHitRecordX.size(),"single_segm_chambers_per_event","","Single segment chambers per event","Entries",4,100,0.0,100.0,1.0,"Test");
+      std::cout<<" single segment chambers size "<<m_Single_cscSegments_recHitRecordX.size()<<std::endl;
+       histos->fill1DHist((Float_t)m_Single_cscSegments_recHitRecordX.size(),"segm_chambers_per_event","","segment chambers per event","Entries",4,100,0.0,100.0,1.0,"Test");
 
        Int_t nhits_single_segm_event=0;
        for(std::map<Int_t,std::vector <Double_t> >::iterator It=m_Single_cscSegments_recHitRecordX.begin(); It!= m_Single_cscSegments_recHitRecordX.end();++It) {
           Int_t key_chmb=(*It).first;
           for(Int_t i=0;i<6;i++) if(m_Single_cscSegments_recHitRecordX[key_chmb][i] > -999.0) nhits_single_segm_event++;
        }
-       histos->fill1DHist((float)nhits_single_segm_event,"single_segm_rechits_per_event","","Single segment hits per event","Entries",4,100,0.0,100.0,1.0,"Test");
+       histos->fill1DHist((float)nhits_single_segm_event,"segm_rechits_per_event","","Segment hits per event","Entries",4,100,0.0,100.0,1.0,"Test");
      }
 }
 
@@ -446,76 +448,122 @@ void AnalysisGasGain::GetSegments(HistMan* histos) {
 
 void AnalysisGasGain::GetTracks(HistMan* histos) {
 	   if(debug_bool) std::cout<<" inside Get Tracks "<<std::endl;
+	   if(debug_new) std::cout<<" inside Get Tracks for the event "<<std::endl;
      ostringstream ss;
-     if(m_Single_cscSegments_recHitRecordX.size() > 0) {//There should be at least one single segment in a chamber
+    // if(m_Single_cscSegments_recHitRecordX.size() > 0) {//There should be at least one single segment in a chamber
 
      Int_t trackne=0;  //  e.g. it gives us the number of muons in an event which have CSC segments
+	   if(debug_new) std::cout<<" number of muons from other track "<<fmuons_cscSegmentRecord_nRecHits->size()<<std::endl;
      for(UInt_t i=0;i<fmuons_cscSegmentRecord_nRecHits->size();i++) //Loop over muons
         if(i<10 && (*fmuons_cscSegmentRecord_nRecHits)[i].size() > 0) 
-	 // i< 10 due to use in key for map
+      	 // i< 10 due to use in key for map
          trackne++;
 
-     histos->fill1DHist((Float_t)trackne,"nonempty_tracks_per_event","","Number of non empty tracks per event","Entires",4,10,0.0,10.0,1.0,"Test");
+     histos->fill1DHist((Float_t)trackne,"muons_per_event","","Number of muons per event","Entires",4,10,0.0,10.0,1.0,"Test");
 
      //// New commented off by Neha // if(trackne == 1) { // use events with single muon
      Int_t trackneindmx=0;
+     int passed_sel = 0; 
+     // Loop over muons
+      for(UInt_t i=0;i<fmuons_cscSegmentRecord_nRecHits->size();i++) {
+        if(debug_new) std::cout<<" inside the loop for the muons "<<i<<
+        " size "<<(*fmuons_cscSegmentRecord_nRecHits)[i].size()<<std::endl;
+        // Going to all the segments in a muon
+        if(i<10 && (*fmuons_cscSegmentRecord_nRecHits)[i].size() > 0  && 
+        (fmuons_Zcand[i] && fmuons_isomuondzdxy[i] )) { //Last part to make sure that muon is isolated and passes Zmumu selection
+          passed_sel++;
+          if(debug_new) std::cout<<" passed the Zmumu selection : "<<passed_sel<<std::endl;
+          // i< 10 due to use in key for map
+          histos->fill1DHist((Float_t)(*fmuons_cscSegmentRecord_nRecHits)[i].size(),
+          "segments_per_muon","","Number of CSC segments per muon","Entries",4,10,0.0,10.0,1.0,"Test");
+          if((Int_t)i>trackneindmx) trackneindmx=(Int_t)i;
 
-     for(UInt_t i=0;i<fmuons_cscSegmentRecord_nRecHits->size();i++) {
-       if(i<10 && (*fmuons_cscSegmentRecord_nRecHits)[i].size() > 0   && (fmuons_Zcand[i] && fmuons_isomuondzdxy[i] )) {//Last part added by Laurent
-	 // i< 10 due to use in key for map
-          histos->fill1DHist((Float_t)(*fmuons_cscSegmentRecord_nRecHits)[i].size(),"segments_per_track","","Number of CSC segments per track","Entries",4,10,0.0,10.0,1.0,"Test");
-         if((Int_t)i>trackneindmx) trackneindmx=(Int_t)i;
+          Int_t segmindmx=0;
 
-         Int_t segmindmx=0;
-         for(UInt_t j=0;j<(*fmuons_cscSegmentRecord_nRecHits)[i].size();j++) {
+
+          // Going to all the hits in a segment
+          Int_t total_muon_hits=0;
+          for(UInt_t j=0;j<(*fmuons_cscSegmentRecord_nRecHits)[i].size();j++) {
+            total_muon_hits = total_muon_hits + (*fmuons_cscSegmentRecord_nRecHits)[i][j];
+           std::cout<<" hits "<<(*fmuons_cscSegmentRecord_nRecHits)[i][j]<<std::endl;
            if(j<10) { // limited due to use in key for map
            if((Int_t)j>segmindmx) segmindmx=(Int_t)j;
-           Int_t endcap=(Int_t)(*fmuons_cscSegmentRecord_endcap)[i][j];
-           Int_t station=(Int_t)(*fmuons_cscSegmentRecord_station)[i][j];
-           Int_t ring=(Int_t)(*fmuons_cscSegmentRecord_ring)[i][j];
-           Int_t chamber=(Int_t)(*fmuons_cscSegmentRecord_chamber)[i][j];
-           Double_t localX=(*fmuons_cscSegmentRecord_localX)[i][j];
-           Double_t localY=(*fmuons_cscSegmentRecord_localY)[i][j];
-           Double_t nlayers=(*fmuons_cscSegmentRecord_nRecHits)[i][j];
-    
-           UInt_t key_trksegm=1000000*endcap+100000*station+10000*ring+
-                         100*chamber+10*i+j;
-           Int_t key_chmb=(Int_t)(key_trksegm/100);
+              Int_t endcap=(Int_t)(*fmuons_cscSegmentRecord_endcap)[i][j];
+              Int_t station=(Int_t)(*fmuons_cscSegmentRecord_station)[i][j];
+              Int_t ring=(Int_t)(*fmuons_cscSegmentRecord_ring)[i][j];
+              Int_t chamber=(Int_t)(*fmuons_cscSegmentRecord_chamber)[i][j];
+              Double_t localX=(*fmuons_cscSegmentRecord_localX)[i][j];
+              Double_t localY=(*fmuons_cscSegmentRecord_localY)[i][j];
+              Double_t nlayers=(*fmuons_cscSegmentRecord_nRecHits)[i][j];
+              UInt_t key_segment=1000000*endcap+100000*station+10000*ring+100*chamber+i;
+              UInt_t key_trksegm=1000000*endcap+100000*station+10000*ring+ 100*chamber+i;
+              Int_t key_chmb=(Int_t)(key_trksegm/100);
 
-
-	   if(m_nsegments_chamber.find(key_chmb) != m_nsegments_chamber.end())
-             if(m_nsegments_chamber[key_chmb]==1) {
-               Int_t nhit=0;
-               for(Int_t k=0;k<6;k++) 
-		 if(m_Single_cscSegments_recHitRecordX[key_chmb][k]>-999.0)
-                   nhit++;
-               if(nhit != (Int_t)nlayers) {
-                 cout<<"Warning - diff. # of hits "<<nhit<<" "<<nlayers<<" "<<key_trksegm<<"  "<<key_chmb<<"  "<<fEvent<<endl;
-                 histos->fill1DHist((Float_t)nlayers,"nhits_ne_nlayers","","# of layers given in track segment and different from original segment","Entires",4,8,0.0,8.0,1.0,"Test");
-	       }
-               if(nhit==(Int_t)nlayers) {
+              // to make sure there is a segment in the chamber
+        	    if(m_nsegments_chamber.find(key_chmb) != m_nsegments_chamber.end()){
+              // The condition is to check number of segments in the chamber,and there should be just 1 segment in the chamber
+              //if(m_nsegments_chamber[key_chmb]==1)  // commented out by Neha
+              Int_t nhit=0;
+              for(Int_t k=0;k<6;k++)  
+		           if(m_Single_cscSegments_recHitRecordX[key_chmb][k]>-999.0) nhit++;
+                
+              if(nhit != (Int_t)nlayers) {
+                cout<<"Warning - diff. # of hits "<<nhit<<" "<<nlayers<<" "<<key_trksegm<<"  "<<key_chmb<<"  "<<fEvent<<endl;
+                histos->fill1DHist((Float_t)nlayers,"nhits_ne_nlayers","","# of layers given in track segment and different from original segment","Entires",4,8,0.0,8.0,1.0,"Test");
+              }
+              if(nhit==(Int_t)nlayers) {
                  Double_t sumx=0.0,sumy=0.0;
-                 for(Int_t k=0;k<6;k++) 
-		   if(m_Single_cscSegments_recHitRecordX[key_chmb][k]>-999.0) {
-                      Int_t key_layer=10*key_chmb+(k+1);
-                      if(m_cscSegments_single_trk_recHitRecord.find(key_layer)==m_cscSegments_single_trk_recHitRecord.end()) 
-		        m_cscSegments_single_trk_recHitRecord[key_layer]=zero6;
-                      m_cscSegments_single_trk_recHitRecord[key_layer][0]=m_Single_cscSegments_recHitRecordX[key_chmb][k];
-                      m_cscSegments_single_trk_recHitRecord[key_layer][1]=m_Single_cscSegments_recHitRecordY[key_chmb][k];
-                      m_cscSegments_single_trk_recHitRecord[key_layer][2]=-999.0;  
-		      m_cscSegments_single_trk_recHitRecord[key_layer][3]=(Double_t) fmuons_pt[i];//Laurent: pt of the associated mu 
-		      m_cscSegments_single_trk_recHitRecord[key_layer][4]=(Double_t) fmuons_eta[i];//Laurent: eta of the associated mu 
-		      m_cscSegments_single_trk_recHitRecord[key_layer][5]=(Double_t) fmuons_phi[i];//Laurent: eta of the associated mu 
-		      //		      cout <<"pt, eta " <<fmuons_pt[i]<<", "<<fmuons_eta[i]<<endl;
-                      sumx=sumx+m_Single_cscSegments_recHitRecordX[key_chmb][k];
-                      sumy=sumy+m_Single_cscSegments_recHitRecordY[key_chmb][k];
-		   }
-                 Double_t x_aver=sumx/(Double_t)nhit;
-                 Double_t y_aver=sumy/(Double_t)nhit; 
+                 for(Int_t k=0;k<6;k++) {
+                     Int_t key_layer=10*key_chmb+(k+1);
+                     std::cout<<" layer record "<<key_layer<<std::endl;
+                     // we will fill the single trk 
+                     if(m_cscSegments_single_trk_recHitRecord.find(key_chmb)==m_cscSegments_single_trk_recHitRecord.end()) 
+	          	       m_cscSegments_single_trk_recHitRecord[key_layer]=zero6;
+                     std::cout<<" during checking the trk record "<<key_layer<<"key chamber "<<key_chmb<<std::endl;
+                     std::cout<<" event number "<<_eventNb<<" muon number "<<i<<" layer "<<k
+                     <<"key layer  "<<key_layer<<" key segment "<<key_trksegm<<std::endl;
+                     if( m_Single_cscSegments_recHitRecordX.find(key_chmb)!= m_Single_cscSegments_recHitRecordX.end()){
+                      if( m_Single_cscSegments_recHitRecordY.find(key_chmb)!= m_Single_cscSegments_recHitRecordY.end()){
+                        if( m_Single_cscSegments_recHitRecordX[key_chmb][k] > -999.0 && m_Single_cscSegments_recHitRecordY[key_chmb][k] > -999.0 ){
+                         std::cout<<" position X"<<m_Single_cscSegments_recHitRecordX[key_chmb][k]<<" position from muon "<<localX<<std::endl;
+                         std::cout<<" position Y"<<m_Single_cscSegments_recHitRecordY[key_chmb][k]<<" position from muon "<<localY<<std::endl;
+                         m_cscSegments_single_trk_recHitRecord[key_layer][0]=m_Single_cscSegments_recHitRecordX[key_chmb][k];
+                         m_cscSegments_single_trk_recHitRecord[key_layer][1]=m_Single_cscSegments_recHitRecordY[key_chmb][k];
+                         std::cout<<" after filling the vector elements in GetTracks "<<std::endl;
+                        }
+                      }
+                     }
+                     else{
+                      m_cscSegments_single_trk_recHitRecord[key_layer][0]= -999.0;
+                      m_cscSegments_single_trk_recHitRecord[key_layer][1]= -999.0;
+                      std::cout<<" during checking the trk record position is zero"<<std::endl;
+                     } 
+
+                    m_cscSegments_single_trk_recHitRecord[key_layer][2]=-999.0;  
+		                m_cscSegments_single_trk_recHitRecord[key_layer][3]=(Double_t) fmuons_pt[i];//Laurent: pt of the associated mu 
+		                m_cscSegments_single_trk_recHitRecord[key_layer][4]=(Double_t) fmuons_eta[i];//Laurent: eta of the associated mu 
+		                m_cscSegments_single_trk_recHitRecord[key_layer][5]=(Double_t) fmuons_phi[i];//Laurent: eta of the associated mu 
+		      		      cout <<"pt, eta " <<fmuons_pt[i]<<", "<<fmuons_eta[i]<<endl;
+                    sumx=sumx+localX;
+                    sumy=sumy+localY;
+                  }// end of layers k going through 6 layers
+               } // end of checking (nhit==(Int_t)nlayers)
+	          } // ended checking that there is a segment
+	         } // ended of j <10 
+         } // ended going through all the hits int the segment
+          histos->fill1DHist(total_muon_hits,
+          "Number_of_hits_for_each_muon","","Number of hits per muon in an event","Entries",4,100,0.0,100.0,1.0,"Test");
+	     } // end of for(UInt_t j=0;j<(*fmuons_cscSegmentRecord_nRecHits)[i]... ended going through all the muons
+      } // ended looking through the muons
+
+  } // end of Get Tracks
+
+/*               Double_t x_aver=sumx/(Double_t)nlayers;
+                 Double_t y_aver=sumy/(Double_t)nlayers; 
 
                  if(m_muon_segm.find(key_trksegm)==m_muon_segm.end())
                    m_muon_segm[key_trksegm]=zero3;
-	           m_muon_segm[key_trksegm][0]=localX;
+	              m_muon_segm[key_trksegm][0]=localX;
                  m_muon_segm[key_trksegm][1]=localY;
                  m_muon_segm[key_trksegm][2]=nlayers;
                  if(nhit==6) {
@@ -536,36 +584,34 @@ void AnalysisGasGain::GetTracks(HistMan* histos) {
 		     histos->fill2DHist(dy,y_aver,ss.str().c_str(),"","dy, cm","Yloc, cm","COLZ",25,-0.25,0.0,75,-150.0,150.0,1.0,"Test");
 
 
-		   }
-		 } // end of if(nhit==6)
-	       } // end of if(nhit==(Int_t)nlayers)
-	     } // end of if(m_nsegments_chamber[key_chmb]==1)
-	   } // end of if j<10
-	 } // end of for(UInt_t j=0;j<(*fmuons_cscSegmentRecord_nRecHits)[i]...
-         histos->fill1DHist((Float_t)segmindmx,"segmindmx_per_event","","Max. segment index in nonempty track per event","Entires",4,10,0.0,10.0,1.0,"Test");
-       } // end of if (*fmuons_cscSegmentRecord_nRecHits)[i].size() > 0
-     } // end of for(UInt_t i=0;i<fmuons_cscSegmentRecord_nRecHits->size();i++)
-     histos->fill1DHist((Float_t)trackneindmx,"trackneindmx_per_event","","Max. nonempty track index per event","Entires",4,30,0.0,30.0,1.0,"Test");
+		   } */
+     
+   //    } // end of if (*fmuons_cscSegmentRecord_nRecHits)[i].size() > 0
+     // Total number of muons that pass the selection of tracks
+   ///  if(debug_new) std::cout<<" passed "<<passed_sel<<" muons "<<std::endl;
+   ///  histos->fill1DHist((Float_t)trackneindmx,"trackneindmx_per_event","","Max. nonempty track index per event","Entires",4,30,0.0,30.0,1.0,"Test");
 
-     if(m_cscSegments_single_trk_recHitRecord.size() > 0) 
-       histos->fill1DHist((Float_t)m_cscSegments_single_trk_recHitRecord.size(),"single_segm_rechits_trk_per_event","","Track single segment hits per event","Entries",4,100,0.0,100.0,1.0,"Test");
-     if(m_muon_segm.size() > 0) histos->fill1DHist((Float_t)m_muon_segm.size(),"single_segm_tracks_per_event","","# of single track_segments per event","Entires",4,20,0.0,20.0,1.0,"Test");
-     //// new commented off by Neha } // end of if single muon track per event (trackne==1)
-     } // end of    if(m_Single_cscSegments_recHitRecordX.size() > 0) 
-	   if(debug_bool) std::cout<<" ending Get Tracks "<<std::endl;
-}
+   ///  if(m_cscSegments_single_trk_recHitRecord.size() > 0) 
+   ///    histos->fill1DHist((Float_t)m_cscSegments_single_trk_recHitRecord.size(),"single_segm_rechits_trk_per_event","","Track single segment hits per event","Entries",4,100,0.0,100.0,1.0,"Test");
+   ///  if(m_muon_segm.size() > 0) histos->fill1DHist((Float_t)m_muon_segm.size(),"single_segm_tracks_per_event","","# of single track_segments per event","Entires",4,20,0.0,20.0,1.0,"Test");
+    //} // end of if single muon track per event (trackne==1)
+	  /// if(debug_bool) std::cout<<" ending Get Tracks "<<std::endl;
+    // } // end of GetTracks
 
 /* *******************  GetRecHitsSumQ ********************************* */
 
 void AnalysisGasGain::GetRecHitsSumQ(HistMan* histos) {
 
+// To check if two rechits pass a key layer
+    std::map<Int_t, int> rechit_count ; // number of rechits per key layer
+    std::map<Int_t, Double_t> temp_sumq; // sum of charges per key layer
 	   if(debug_bool) std::cout<<" to collect charges : event "<<_eventNb<<std::endl;
      if(m_cscSegments_single_trk_recHitRecord.size() > 0) {
        for(Int_t irechit=0;irechit<frecHits2D_nRecHits2D;irechit++) {
           Int_t ring=frecHits2D_ID_ring[irechit];
           // look at hits with SumQ>0 and not from ME1/4
-	  if((frecHits2D_SumQ[irechit] > 0.0) ) { // Commented out Laurent on 27/11/2017
-	  //          if((frecHits2D_SumQ[irechit] > 0.0) && (ring !=4)) {
+      	  if((frecHits2D_SumQ[irechit] > 0.0) ) { // Commented out Laurent on 27/11/2017
+      	  //          if((frecHits2D_SumQ[irechit] > 0.0) && (ring !=4)) {
             Int_t endcap=frecHits2D_ID_endcap[irechit];
             Int_t station=frecHits2D_ID_station[irechit];
             Int_t chamber=frecHits2D_ID_chamber[irechit];
@@ -579,36 +625,58 @@ void AnalysisGasGain::GetRecHitsSumQ(HistMan* histos) {
             if(m_cscSegments_single_trk_recHitRecord.find(key_layer)!=m_cscSegments_single_trk_recHitRecord.end()) {
               Double_t dx=xloc-m_cscSegments_single_trk_recHitRecord[key_layer][0];
               Double_t dy=yloc-m_cscSegments_single_trk_recHitRecord[key_layer][1];
-	      
-	      if(fabs(dx) < 0.0001 && fabs(dy) < 0.0001)
-               m_cscSegments_single_trk_recHitRecord[key_layer][2]=sumq;
+	     
+              rechit_count[key_layer]++;
+              if(fabs(dx) < 0.0001 && fabs(dy) < 0.0001){
+//                cout<<"passed X local "<<xloc<<" muon "<<m_cscSegments_single_trk_recHitRecord[key_layer][0]<< "  y local "<<yloc<<" muon "<<m_cscSegments_single_trk_recHitRecord[key_layer][1]<<endl;
+                 // count the number of rechits per key layer
+ //               std::cout<<"charge for key layer "<<key_layer<<" charge "<<sumq<<" event "<<_eventNb<<std::endl;
+                temp_sumq[key_layer] = sumq; // sum of charges per key layer
+              } // end of if(fabs(dx) < 0.0001 && fabs(dy) < 0.0001)
+              else{
+                cout<<"Warning, dx, dy not zero "<<dx<<" "<<dy<<" "<<key_layer<<"  "<<fEvent<<" key layer"<<key_layer<<endl;
+//                cout<<"Warning X local "<<xloc<<" muon "<<m_cscSegments_single_trk_recHitRecord[key_layer][0]<<"  y local "<<yloc<<" muon "<<m_cscSegments_single_trk_recHitRecord[key_layer][1]<<endl;
+              }
 
 	    } // end of if(m_cscSegments_single_trk_recHitRecord.find...
 	  } // end of  if((frecHits2D_SumQ[irechit] > 0.0)
-       } // end of  for(Int_t irechit=0;irechit<frecHits2D_nRecHits2D;
+  } // end of  for(Int_t irechit=0;irechit<frecHits2D_nRecHits2D;
+              
+      for (const auto& entry : rechit_count) {
+            Int_t key_layer = entry.first;
+            int count = entry.second;
+            // Only store sumq if there is exactly one rechit for this key layer
+            if (count == 1) {
+//                std::cout<<"only one rechit per key layer "<<key_layer<<"  "<<fEvent<<" sum "<<temp_sumq[key_layer]<<std::endl;
+                m_cscSegments_single_trk_recHitRecord[key_layer][2] = temp_sumq[key_layer];
+            } else {
+ //               std::cout << "Multiple rechits for key layer: " << key_layer << ". sumQ not stored." << std::endl;
+            }
+        }
 
-        for(map<Int_t, std::vector <Double_t> >::iterator It=m_cscSegments_single_trk_recHitRecord.begin(); It!=m_cscSegments_single_trk_recHitRecord.end(); It++) {
-       if((*It).second[2] > 0.0) {
-         Int_t key_layer=(*It).first;
+        for(map<Int_t, std::vector <Double_t> >::iterator It=m_cscSegments_single_trk_recHitRecord.begin(); 
+        It!=m_cscSegments_single_trk_recHitRecord.end(); It++) {
+          if((*It).second[2] > 0.0) {
+          Int_t key_layer=(*It).first;
      
-         if(m_cscSegments_single_trk_recHitRecord_final.find(key_layer)==
-	    m_cscSegments_single_trk_recHitRecord_final.end())
-           m_cscSegments_single_trk_recHitRecord_final[key_layer]=
-	   m_cscSegments_single_trk_recHitRecord[key_layer];
-       }
-	} // end of  for(map<Int_t, std::vector <Double_t> >::iterator It=m_cscSegments_single_trk_recHitRecord.begin()
+          if(m_cscSegments_single_trk_recHitRecord_final.find(key_layer)==
+      	    m_cscSegments_single_trk_recHitRecord_final.end())
+            m_cscSegments_single_trk_recHitRecord_final[key_layer]=
+	          m_cscSegments_single_trk_recHitRecord[key_layer];
+          }
+   	    } // end of  for(map<Int_t, std::vector <Double_t> >::iterator It=m_cscSegments_single_trk_recHitRecord.begin()
 
         Float_t df=(Float_t)m_cscSegments_single_trk_recHitRecord.size() - 
 	           (Float_t)m_cscSegments_single_trk_recHitRecord_final.size();
 	      
-	//Laurent        histos->fill1DHist(df,"diff_map_sizes","","Difference in two map sizes","Entries",4,10,0.0,10.0,1.0,"Test");
+      	//Laurent        histos->fill1DHist(df,"diff_map_sizes","","Difference in two map sizes","Entries",4,10,0.0,10.0,1.0,"Test");
         if(df !=0.0) 
-	  cout<<"Warning, different sizes "<<m_cscSegments_single_trk_recHitRecord.size()<<" "<<m_cscSegments_single_trk_recHitRecord_final.size()<<" "<<fEvent<<endl;
-	// histos->fill1DHist((Float_t)m_cscSegments_single_trk_recHitRecord_final.size(),"final_used_rechits_no_ME14_per_event","","Number of used rechits(no ME14) per event","Entries",4,100,0.0,100.0,1.0,"Test");    //laurent: I commented this line:
+	      cout<<"Warning, different sizes "<<m_cscSegments_single_trk_recHitRecord.size()<<" "<<m_cscSegments_single_trk_recHitRecord_final.size()<<" "<<fEvent<<endl;
+        histos->fill1DHist((Float_t)m_cscSegments_single_trk_recHitRecord_final.size(),"final_used_rechits_no_per_event","","Number of used rechits per event","Entries",4,100,0.0,100.0,1.0,"Test");    //laurent: I commented this line:
 
-	   if(debug_bool) std::cout<<" finished collect charges "<<std::endl;
-     } // end of if(m_cscSegments_single_trk_recHitRecord.size() > 0)
-}
+	      if(debug_bool) std::cout<<" finished collect charges "<<std::endl;
+       } // end of if(m_cscSegments_single_trk_recHitRecord.size() > 0)
+  }
 
 /* ********************  AddME14RecHits ******************************* */
 
@@ -941,6 +1009,7 @@ for(Int_t ient=0;ient<nentries;ient++) {
 
   if(debug_bool)  std::cout<<"loading of branches done`"<<std::endl;
 
+      histos->fill1DHist(fmuons_nMuons,"number_muons_per_event","","Number of muons per event","Entries",4,10,0.0,10.0,1.0,"Test");   
 
      for( int iM = 0; iM< fmuons_nMuons;iM++) {
 			 fmuons_Zcand[iM] = false; fmuons_isomuondzdxy[iM] = false;}
@@ -950,6 +1019,8 @@ for(Int_t ient=0;ient<nentries;ient++) {
      double mass =-1;
 
        if(debug_bool) std::cout<<"enteing the loop for checking each muon entry"<<std::endl;
+       if(debug_new) std::cout<<" number of muons in the event "<<fmuons_nMuons<<std::endl;
+
       for( int iM = 0; iM<  fmuons_nMuons;iM++){
        if(  fmuons_pt[iM]<10) continue;
        if(fabs(fmuons_dz[iM]) >0.2) continue;
@@ -979,12 +1050,15 @@ for(Int_t ient=0;ient<nentries;ient++) {
 	 z_eta = (mu1+mu2).Eta();
 	 z_phi = (mu1+mu2).Phi();
 	 z_mass = (mu1+mu2).Mag();
+
+     if(debug_new) std::cout<<"event passed muons "<<iM<<" : "<<jM<<" mass "<<z_mass<<" number of muons "<<fmuons_nMuons<<std::endl;
        }
      }
 
 			if(passisomuondzdxy ==false) continue;
 			if(passZmumusel ==false) continue;
-
+    histos->fill1DHist(z_mass,"Zmass","","Zmass","Entries/(0.4GeV)",4,100,70,110.0,1.0,"Test");
+    histos->fill1DHist(z_pt,"Zpt","","Zpt","Entries",4,100,0,200.0,1.0,"Test");
 //		 if(fRun == 302448 ) {std::cout<<" these runs  started processing and done "<<fRun<<std::endl; }
 
   //    if(fRun != 302042 && fRun!= 302043 && fRun != 302131 && fRun != 302159 && fRun != 302163 && fRun != 302165 && fRun != 302166 &&  fRun != 302225 && fRun != 302228) continue;    
@@ -1138,7 +1212,7 @@ for(Int_t ient=0;ient<nentries;ient++) {
   cout<<"Total used hits "<<cnt_usedhits<<" in "<<cnt_used<<" used events  from "<<cnt_readin<<" read in events in "<<m_RunEvent.size()<<" runs"<<endl;
   cout<<endl;
   cout<<" End of AnalysisGasGain::CycleTree "<<endl;
-
+///
   //*************************************************************************
   // write and close output file with hists always first in case if hists
   // were stored in f directory
