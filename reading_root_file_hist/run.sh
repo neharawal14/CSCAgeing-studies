@@ -1,0 +1,4 @@
+#python3 reading_rootfile.py ../output_root_files/csc_output_40_all_layer_better_selections.root new_all_layer_isolation_2
+python3 reading_rootfile.py ../output_root_files/csc_output_40_single_layer_better_selections.root new_single_layer_isolation_2
+#python3 reading_rootfile.py ../output_root_files/csc_output_40_single_layer_new_iso_selections.root new_single_layer_isolation_point2
+#python3 reading_rootfile.py ../output_root_files/csc_output_40_all_layer_new_iso_selections.root new_all_layer_isolation_point2
